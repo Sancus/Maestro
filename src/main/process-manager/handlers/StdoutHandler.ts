@@ -673,7 +673,25 @@ export class StdoutHandler {
 			this.emitter.emit('slash-commands', sessionId, slashCommands);
 		}
 
-		// Handle streaming text events (OpenCode, Codex reasoning, Grok thought/text)
+		const isCodexResult =
+			managedProcess.toolType === 'codex' && outputParser.isResultMessage(event) && !!event.text;
+
+		// Legacy Codex JSONL does not distinguish commentary from the final answer:
+		// every user-visible message is an item.completed/agent_message. Keep one
+		// message pending. If any later non-completion event arrives, the pending
+		// message was commentary and can be shown immediately; the last pending
+		// message remains reserved for the final response at turn completion.
+		if (
+			managedProcess.toolType === 'codex' &&
+			managedProcess.codexPendingResultText &&
+			!isCodexResult &&
+			(event.type === 'tool_use' || event.type === 'text')
+		) {
+			this.emitter.emit('thinking-chunk', sessionId, managedProcess.codexPendingResultText);
+			managedProcess.codexPendingResultText = undefined;
+		}
+
+		// Handle streaming text events (OpenCode, Codex reasoning)
 		if (event.type === 'text' && event.isPartial && event.text) {
 			// Thinking panel routing:
 			// - Copilot: never thinking-chunk (deltas accumulate in streamedText
@@ -770,10 +788,14 @@ export class StdoutHandler {
 			}
 		}
 
-		// Codex can emit multiple agent_message results in a single turn:
-		// an interim "I'm checking..." message and then the final answer.
-		// Keep the latest result text and emit once at turn completion.
-		if (managedProcess.toolType === 'codex' && outputParser.isResultMessage(event) && event.text) {
+		// A second Codex agent_message proves the prior one was commentary even
+		// when no tool/reasoning event appeared between them. Show the prior text,
+		// then hold the new message as the possible final answer.
+		if (isCodexResult && event.text) {
+			if (managedProcess.codexPendingResultText) {
+				this.emitter.emit('thinking-chunk', sessionId, managedProcess.codexPendingResultText);
+			}
+			managedProcess.codexPendingResultText = event.text;
 			managedProcess.streamedText = event.text;
 		}
 
@@ -787,6 +809,7 @@ export class StdoutHandler {
 			const resultText = managedProcess.streamedText || '';
 			if (resultText) {
 				managedProcess.resultEmitted = true;
+				managedProcess.codexPendingResultText = undefined;
 				this.bufferManager.emitDataBuffered(sessionId, resultText);
 			}
 		}

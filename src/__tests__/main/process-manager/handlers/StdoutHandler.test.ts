@@ -61,6 +61,7 @@ import { matchSshErrorPattern } from '../../../../main/parsers/error-patterns';
 import { ClaudeOutputParser } from '../../../../main/parsers/claude-output-parser';
 import { CopilotOutputParser } from '../../../../main/parsers/copilot-output-parser';
 import { OmpOutputParser } from '../../../../main/parsers/omp-output-parser';
+import { CodexOutputParser } from '../../../../main/parsers/codex-output-parser';
 import type { ManagedProcess } from '../../../../main/process-manager/types';
 import { logger } from '../../../../main/utils/logger';
 import type { AgentOutputParser } from '../../../../main/parsers/agent-output-parser';
@@ -1026,7 +1027,61 @@ describe('StdoutHandler', () => {
 	});
 
 	describe('codex multi-message turn handling', () => {
-		it('should emit only the final Codex result at turn completion', () => {
+		it('should stream progress and finalize once for the Codex 0.153 JSONL sequence', () => {
+			const { handler, bufferManager, emitter, sessionId, proc } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'codex',
+				outputParser: new CodexOutputParser(),
+			});
+			const thinkingSpy = vi.fn();
+			emitter.on('thinking-chunk', thinkingSpy);
+
+			sendJsonLine(handler, sessionId, {
+				type: 'item.completed',
+				item: {
+					id: 'item_0',
+					type: 'agent_message',
+					text: "I'll inspect the current directory.",
+				},
+			});
+			sendJsonLine(handler, sessionId, {
+				type: 'item.started',
+				item: {
+					id: 'item_1',
+					type: 'command_execution',
+					command: 'Get-ChildItem',
+					status: 'in_progress',
+				},
+			});
+			sendJsonLine(handler, sessionId, {
+				type: 'item.completed',
+				item: {
+					id: 'item_1',
+					type: 'command_execution',
+					command: 'Get-ChildItem',
+					aggregated_output: 'README.md',
+					exit_code: 0,
+					status: 'completed',
+				},
+			});
+			sendJsonLine(handler, sessionId, {
+				type: 'item.completed',
+				item: { id: 'item_2', type: 'agent_message', text: 'probe complete' },
+			});
+			sendJsonLine(handler, sessionId, {
+				type: 'turn.completed',
+				usage: { input_tokens: 100, output_tokens: 20 },
+			});
+
+			expect(thinkingSpy).toHaveBeenCalledOnce();
+			expect(thinkingSpy).toHaveBeenCalledWith(sessionId, "I'll inspect the current directory.");
+			expect(bufferManager.emitDataBuffered).toHaveBeenCalledOnce();
+			expect(bufferManager.emitDataBuffered).toHaveBeenCalledWith(sessionId, 'probe complete');
+			expect(proc.resultEmitted).toBe(true);
+			expect(proc.codexPendingResultText).toBeUndefined();
+		});
+
+		it('should reveal legacy Codex progress while emitting only the final result as data', () => {
 			const parser = {
 				agentId: 'codex',
 				parseJsonLine: vi.fn((line: string) => {
@@ -1052,6 +1107,9 @@ describe('StdoutHandler', () => {
 					if (parsed.type === 'agent') {
 						return { type: 'result', text: parsed.text };
 					}
+					if (parsed.type === 'tool') {
+						return { type: 'tool_use', toolName: parsed.text };
+					}
 					if (parsed.type === 'done') {
 						return {
 							type: 'usage',
@@ -1074,11 +1132,13 @@ describe('StdoutHandler', () => {
 				detectErrorFromParsed: vi.fn(() => null),
 			};
 
-			const { handler, bufferManager, sessionId, proc } = createTestContext({
+			const { handler, bufferManager, emitter, sessionId, proc } = createTestContext({
 				isStreamJsonMode: true,
 				toolType: 'codex',
 				outputParser: parser as any,
 			});
+			const thinkingSpy = vi.fn();
+			emitter.on('thinking-chunk', thinkingSpy);
 
 			sendJsonLine(handler, sessionId, {
 				type: 'agent',
@@ -1086,6 +1146,17 @@ describe('StdoutHandler', () => {
 			});
 			expect(bufferManager.emitDataBuffered).not.toHaveBeenCalled();
 			expect(proc.resultEmitted).toBe(false);
+			expect(thinkingSpy).not.toHaveBeenCalled();
+
+			sendJsonLine(handler, sessionId, {
+				type: 'tool',
+				text: 'shell',
+			});
+			expect(thinkingSpy).toHaveBeenCalledTimes(1);
+			expect(thinkingSpy).toHaveBeenCalledWith(
+				sessionId,
+				"I'm checking the project directory now."
+			);
 
 			sendJsonLine(handler, sessionId, {
 				type: 'agent',
@@ -1093,6 +1164,7 @@ describe('StdoutHandler', () => {
 			});
 			expect(bufferManager.emitDataBuffered).not.toHaveBeenCalled();
 			expect(proc.resultEmitted).toBe(false);
+			expect(thinkingSpy).toHaveBeenCalledTimes(1);
 
 			sendJsonLine(handler, sessionId, { type: 'done' });
 
@@ -1102,6 +1174,34 @@ describe('StdoutHandler', () => {
 				sessionId,
 				'{"confidence":55,"ready":false,"message":"README.md"}'
 			);
+			expect(thinkingSpy).toHaveBeenCalledTimes(1);
+		});
+
+		it('should reveal the prior Codex message when another agent message follows directly', () => {
+			const parser = {
+				agentId: 'codex',
+				parseJsonLine: vi.fn(),
+				parseJsonObject: vi.fn((parsed: any) => ({ type: 'result', text: parsed.text })),
+				extractUsage: vi.fn(() => null),
+				extractSessionId: vi.fn(() => null),
+				extractSlashCommands: vi.fn(() => null),
+				isResultMessage: vi.fn((event: any) => event.type === 'result' && !!event.text),
+				detectErrorFromLine: vi.fn(() => null),
+				detectErrorFromParsed: vi.fn(() => null),
+			};
+			const { handler, emitter, sessionId } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'codex',
+				outputParser: parser as any,
+			});
+			const thinkingSpy = vi.fn();
+			emitter.on('thinking-chunk', thinkingSpy);
+
+			sendJsonLine(handler, sessionId, { text: 'First progress update.' });
+			sendJsonLine(handler, sessionId, { text: 'Second progress update.' });
+
+			expect(thinkingSpy).toHaveBeenCalledOnce();
+			expect(thinkingSpy).toHaveBeenCalledWith(sessionId, 'First progress update.');
 		});
 	});
 

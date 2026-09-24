@@ -126,6 +126,10 @@ export interface ManagedProcess {
 	stderrBuffer?: string;
 	stdoutBuffer?: string;
 	streamedText?: string;
+	/** Latest untagged Codex agent_message. Codex's legacy JSONL format uses the
+	 *  same shape for progress updates and the final answer, so StdoutHandler
+	 *  holds one message until a later event proves whether the turn continued. */
+	codexPendingResultText?: string;
 	contextWindow?: number;
 	ompModelCatalogKey?: string;
 	/** Last omp usage payload that was emitted WITHOUT a catalog-resolved context
