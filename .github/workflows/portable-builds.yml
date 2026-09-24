@@ -173,7 +173,7 @@ jobs:
           for asset in \
             "release/maestro-${VERSION}-x64-mac.zip" \
             "release/maestro-${VERSION}-arm64-mac.zip" \
-            "release/maestro-${VERSION}-x64.AppImage" \
+            "release/maestro-${VERSION}-x86_64.AppImage" \
             "release/maestro-${VERSION}-arm64.AppImage" \
             "release/Maestro-Portable-${VERSION}-x64.exe"; do
             test -s "$asset" || { echo "Missing release file: $asset" >&2; exit 1; }
