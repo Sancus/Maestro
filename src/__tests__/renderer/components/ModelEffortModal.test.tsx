@@ -92,8 +92,7 @@ describe('ModelEffortModal', () => {
 		renderModal();
 		await screen.findByText('claude-sonnet-4.5');
 
-		// Selection starts on '(default)' (index 0); one Down lands on the first model.
-		fireEvent.keyDown(keyTarget(), { key: 'ArrowDown' });
+		// The first model is selected directly; one Down reaches the next model.
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowDown' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowRight' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowRight' });
@@ -118,7 +117,7 @@ describe('ModelEffortModal', () => {
 		renderModal();
 		await screen.findByText('claude-sonnet-4.5');
 
-		// Up from '(default)' wraps to the last model; Left from '(default)' wraps
+		// Up from the first model wraps to the last; Left from '(default)' wraps
 		// to the highest effort.
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowUp' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowLeft' });
@@ -128,31 +127,35 @@ describe('ModelEffortModal', () => {
 		expect(setTabEffort).toHaveBeenCalledWith('tab-1', 'high');
 	});
 
-	it('clears the override when the (default) row is committed', async () => {
+	it('selects the configured default model as an ordinary model choice', async () => {
+		(window.maestro.agents.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+			model: 'claude-sonnet-4.5',
+		});
 		seedStore({ customModel: 'gpt-5', customEffort: 'high' });
 		renderModal();
 		await screen.findByText('gpt-5');
 
-		// gpt-5 sits at index 2; two Ups return to '(default)'.
-		fireEvent.keyDown(keyTarget(), { key: 'ArrowUp' });
+		// The default model is the preceding model, without a separate row.
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowUp' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowLeft' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowLeft' });
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowLeft' });
 		fireEvent.keyDown(keyTarget(), { key: 'Enter' });
 
-		expect(setTabModel).toHaveBeenCalledWith('tab-1', undefined);
+		expect(setTabModel).toHaveBeenCalledWith('tab-1', 'claude-sonnet-4.5');
 		expect(setTabEffort).toHaveBeenCalledWith('tab-1', undefined);
 	});
 
 	it('names the vendor of whichever model the wheel is on', async () => {
 		// A wheel has no room for group headers, so the family travels with the
 		// selection instead. Walking the catalog must re-label as it goes.
+		(window.maestro.agents.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+			model: 'claude-sonnet-4.5',
+		});
 		renderModal();
 		await screen.findByText('claude-sonnet-4.5');
 
-		fireEvent.keyDown(keyTarget(), { key: 'ArrowDown' });
-		expect(screen.getByText('Claude')).toBeInTheDocument();
+		expect(screen.getByText('Claude · current')).toBeInTheDocument();
 
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowDown' });
 		expect(screen.getByText('OpenAI')).toBeInTheDocument();
@@ -161,27 +164,28 @@ describe('ModelEffortModal', () => {
 		expect(screen.getByText('Gemini')).toBeInTheDocument();
 	});
 
-	it('spells out what the (default) row resolves to', async () => {
-		// '(default)' alone says nothing about what will actually run; the caption
-		// is the only place the agent-level model is named.
+	it('shows the configured default model without an extra row', async () => {
 		(window.maestro.agents.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
 			model: 'claude-sonnet-4.5',
 		});
 		renderModal();
-		// With an agent-level default set, the wheel opens on the resolved model,
-		// so reaching the '(default)' row takes one step up.
 		await screen.findByText('claude-sonnet-4.5');
-		fireEvent.keyDown(keyTarget(), { key: 'ArrowUp' });
-
-		expect(screen.getByText('Agent default - claude-sonnet-4.5')).toBeInTheDocument();
+		expect(
+			Array.from(document.querySelectorAll('.maestro-wheel-row')).some(
+				(row) => row.textContent === '(default)'
+			)
+		).toBe(false);
 	});
 
-	it('excludes Ultra for Luna and restores it for Sol', async () => {
-		seedStore({ customModel: 'gpt-6-luna' }, 'codex');
+	it('selects the Codex default model and excludes Ultra for Luna', async () => {
+		seedStore({}, 'codex');
 		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockResolvedValue([
 			'gpt-6-luna',
 			'gpt-6-sol',
 		]);
+		(window.maestro.agents.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+			resolvedDefaultModel: 'gpt-6-luna',
+		});
 		(window.maestro.agents.getConfigOptions as ReturnType<typeof vi.fn>).mockImplementation(
 			async (_agentId: string, key: string) =>
 				key === 'reasoningEffort' ? ['', 'medium', 'max', 'ultra'] : []
@@ -195,7 +199,7 @@ describe('ModelEffortModal', () => {
 	});
 
 	it('keeps the wrapped-around neighbour on the wheel', async () => {
-		// The row above '(default)' is the LAST model, not empty space - that is
+		// The row above the first model is the LAST model, not empty space - that is
 		// what makes Up-from-the-top feel continuous rather than blocked.
 		renderModal();
 		await screen.findByText('claude-sonnet-4.5');
@@ -276,7 +280,7 @@ describe('ModelEffortModal', () => {
 			'opus[1m]',
 		]);
 		renderModal();
-		await screen.findByText('opus[1m]');
+		await screen.findByText('opus');
 
 		// First 'o' takes the first match; the second must advance rather than
 		// re-matching the row it already sits on.
@@ -287,16 +291,18 @@ describe('ModelEffortModal', () => {
 		expect(setTabModel).toHaveBeenCalledWith('tab-1', 'opus[1m]');
 	});
 
-	it("reaches the '(default)' row by typing its label", async () => {
-		// The row's model id is '', so it is matched on the word the wheel shows.
+	it('reaches the configured default model by typing its name', async () => {
+		(window.maestro.agents.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+			model: 'claude-sonnet-4.5',
+		});
 		seedStore({ customModel: 'gpt-5' });
 		renderModal();
 		await screen.findByText('gpt-5');
 
-		fireEvent.keyDown(keyTarget(), { key: 'd' });
+		fireEvent.keyDown(keyTarget(), { key: 'c' });
 		fireEvent.keyDown(keyTarget(), { key: 'Enter' });
 
-		expect(setTabModel).toHaveBeenCalledWith('tab-1', undefined);
+		expect(setTabModel).toHaveBeenCalledWith('tab-1', 'claude-sonnet-4.5');
 	});
 
 	it('lets a modified key through instead of treating it as a jump', async () => {
@@ -341,13 +347,13 @@ describe('ModelEffortModal', () => {
 		setCoarsePointer(true);
 		try {
 			renderModal();
-			const row = await screen.findByText('claude-sonnet-4.5');
+			const row = await screen.findByText('gpt-5');
 
 			fireEvent.click(row);
 			expect(setTabModel).not.toHaveBeenCalled();
 
 			fireEvent.click(row);
-			expect(setTabModel).toHaveBeenCalledWith('tab-1', 'claude-sonnet-4.5');
+			expect(setTabModel).toHaveBeenCalledWith('tab-1', 'gpt-5');
 		} finally {
 			restorePointer();
 		}

@@ -10,10 +10,10 @@
  * lives here so there is a single request shape, a single stale-guard, and a
  * single fallback story.
  *
- * Effort options are agent-scoped, not model-scoped: agents expose the list
+ * Fetched effort options are agent-scoped: agents expose the list
  * under either `effort` (Claude Code) or `reasoningEffort` (Codex, Copilot-CLI,
  * Factory Droid, Grok), so both keys are probed and whichever the agent defines
- * wins. That keeps this correct as agents are added without touching callers.
+ * wins. Codex callers then filter the union for the selected model.
  */
 
 import { useEffect, useState } from 'react';
@@ -85,7 +85,7 @@ export function useAgentModelEffortOptions(agentId?: string): AgentModelEffortOp
 			.getConfig(agentId)
 			.then((config) => {
 				if (stale) return;
-				setDefaultModel(config?.model || '');
+				setDefaultModel(config?.model || config?.resolvedDefaultModel || '');
 				setDefaultEffort(readEffortFromConfig(config) ?? '');
 			})
 			.catch(() => {
@@ -103,7 +103,9 @@ export function useAgentModelEffortOptions(agentId?: string): AgentModelEffortOp
 		};
 	}, [agentId]);
 
-	return { models, efforts, defaultModel, defaultEffort, loaded };
+	const visibleModels =
+		defaultModel && !models.includes(defaultModel) ? [defaultModel, ...models] : models;
+	return { models: visibleModels, efforts, defaultModel, defaultEffort, loaded };
 }
 
 /**

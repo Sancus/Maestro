@@ -118,12 +118,10 @@ function isTypeaheadKey(e: React.KeyboardEvent): boolean {
 }
 
 /**
- * The text a model is matched against. '' is the inherit-the-default row,
- * which the wheel labels '(default)' - matching it on 'default' means typing
- * 'd' reaches it, while the parentheses stay a display detail.
+ * The text a model is matched against when typing on the wheel.
  */
 function typeaheadText(model: string): string {
-	return (model || 'default').toLowerCase();
+	return model.toLowerCase();
 }
 
 /**
@@ -163,23 +161,20 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 		defaultModel,
 		defaultEffort,
 	});
-
-	// '' (inherit the agent default) is always offered as the first choice, the
-	// same way the composer pills offer it.
-	const modelOptions = useMemo(() => (models.includes('') ? models : ['', ...models]), [models]);
-	// State holds only what the USER picked; until they move, the selection IS
-	// the tab's current value. Seeding an index from an effect instead would
-	// leave a window right after open where the highlight sits on '(default)'
-	// because the option lists hadn't landed yet - and an Enter inside that
-	// window would clear the override the user came here to nudge.
 	const [pickedModel, setPickedModel] = useState<string | null>(null);
 	const [pickedEffort, setPickedEffort] = useState<string | null>(null);
+
+	const modelOptions = useMemo(() => models.filter(Boolean), [models]);
 	const effortOptions = useMemo(() => {
 		const supported = effortsForModel(agentId, pickedModel ?? currentModel, efforts);
 		if (supported.length === 0) return [];
 		return supported.includes('') ? supported : ['', ...supported];
 	}, [agentId, efforts, pickedModel, currentModel]);
 
+	// State holds only what the USER picked; until they move, the selection IS
+	// the tab's current value. Seeding an index from an effect instead would
+	// leave a window right after open where an Enter could lose the tab's
+	// current override before the option lists have loaded.
 	const selectedModel = pickedModel ?? currentModel;
 	const selectedEffort = pickedEffort ?? currentEffort;
 
@@ -256,9 +251,11 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 	const handleConfirm = useCallback(
 		(overrides?: { model?: string; effort?: string }) => {
 			const { setTabModel, setTabEffort } = useTabStore.getState();
-			setTabModel(tabId, (overrides?.model ?? selectedModel) || undefined);
+			const model = overrides?.model ?? selectedModel;
+			const effort = overrides?.effort ?? selectedEffort;
+			setTabModel(tabId, model || undefined);
 			if (effortOptions.length > 0) {
-				setTabEffort(tabId, (overrides?.effort ?? selectedEffort) || undefined);
+				setTabEffort(tabId, effort || undefined);
 			}
 			onClose();
 		},
@@ -339,8 +336,7 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 	// offered" - claiming the latter early would flash a wrong answer.
 	const hasNothingToTune = loaded && !hasModels && !hasEfforts;
 
-	// The caption under the wheel. It names the vendor for a real model id and
-	// spells out what '(default)' resolves to, which the row itself can't say.
+	// The caption under the wheel names the selected model's vendor.
 	const wheelCaption = useMemo(() => {
 		if (!selectedModel) {
 			return defaultModel ? `Agent default - ${defaultModel}` : 'Agent default';

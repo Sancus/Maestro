@@ -50,14 +50,14 @@ describe('ModelEffortPills', () => {
 		expect(setEffortMenuOpen).toHaveBeenCalledWith(false);
 	});
 
-	it('renders default model option and selects a model', () => {
+	it('selects a model without a separate default option', () => {
 		const onModelChange = vi.fn();
 		const setModelMenuOpen = vi.fn();
 		renderPills({ modelMenuOpen: true, onModelChange, setModelMenuOpen });
 
 		fireEvent.click(screen.getByText('gpt-5-mini'));
 
-		expect(screen.getByText('(default)')).toBeInTheDocument();
+		expect(screen.queryByText('(default)')).not.toBeInTheDocument();
 		expect(onModelChange).toHaveBeenCalledWith('gpt-5-mini');
 		expect(setModelMenuOpen).toHaveBeenCalledWith(false);
 	});
