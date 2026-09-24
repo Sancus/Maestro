@@ -757,7 +757,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get, api) => {
 		logLevel: 'info',
 		maxLogBuffer: 5000,
 		maxOutputLines: Infinity,
-		checkForUpdatesOnStartup: true,
+		checkForUpdatesOnStartup: false,
 		autoResumeOnLimit: true,
 		autoResumeCheckIntervalHours: 2,
 		autoResumeGiveUpDays: 7,

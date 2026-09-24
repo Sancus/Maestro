@@ -123,7 +123,7 @@ function resetStore() {
 		toastDuration: 20,
 		idleNotificationEnabled: false,
 		idleNotificationCommand: 'say Maestro is idle',
-		checkForUpdatesOnStartup: true,
+		checkForUpdatesOnStartup: false,
 		enableBetaUpdates: false,
 		crashReportingEnabled: true,
 		logViewerSelectedLevels: ['debug', 'info', 'warn', 'error', 'toast'],
@@ -251,7 +251,7 @@ describe('settingsStore', () => {
 			expect(state.audioFeedbackEnabled).toBe(false);
 			expect(state.audioFeedbackCommand).toBe('say');
 			expect(state.toastDuration).toBe(20);
-			expect(state.checkForUpdatesOnStartup).toBe(true);
+			expect(state.checkForUpdatesOnStartup).toBe(false);
 			expect(state.enableBetaUpdates).toBe(false);
 			expect(state.crashReportingEnabled).toBe(true);
 			expect(state.logViewerSelectedLevels).toEqual(['debug', 'info', 'warn', 'error', 'toast']);
