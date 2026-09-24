@@ -1,0 +1,139 @@
+name: Portable builds
+
+on:
+  push:
+    branches:
+      - sancus-fixes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: macos
+            arch: x64
+          - os: macos-15
+            platform: macos
+            arch: arm64
+          # Compile x64 native modules against the oldest supported glibc.
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: windows-latest
+            platform: windows
+            arch: x64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Set up Python for node-gyp
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Set up Windows build tools
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libarchive-tools
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set CI build version
+        shell: bash
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          CI_VERSION="${BASE_VERSION}-sancus.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          npm version "$CI_VERSION" --no-git-tag-version --ignore-scripts
+          echo "CI_VERSION=$CI_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build application
+        shell: bash
+        run: VITE_APP_VERSION="$CI_VERSION" npm run build
+
+      - name: Rebuild and verify native modules
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: .github/scripts/rebuild-and-verify-native.sh ${{ matrix.arch }}
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_build_from_source: 'true'
+
+      - name: Rebuild Windows native modules
+        if: matrix.platform == 'windows'
+        run: npm run postinstall
+        env:
+          npm_config_build_from_source: 'true'
+
+      - name: Package macOS ZIP
+        if: matrix.platform == 'macos'
+        run: npx electron-builder --mac zip --${{ matrix.arch }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+
+      - name: Package Linux AppImage
+        if: matrix.platform == 'linux'
+        run: npx electron-builder --linux AppImage --${{ matrix.arch }} --publish never
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+
+      - name: Package Windows portable EXE
+        if: matrix.platform == 'windows'
+        run: npx electron-builder --win portable --x64 --publish never
+
+      - name: Verify Linux native module compatibility
+        if: matrix.platform == 'linux' && matrix.arch == 'x64'
+        run: .github/scripts/verify-glibc-floor.sh 2.35 release/linux-unpacked/resources/app.asar.unpacked
+
+      - name: Upload macOS ZIP
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v6
+        with:
+          name: maestro-portable-macos-${{ matrix.arch }}
+          path: release/*-mac.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux AppImage
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v6
+        with:
+          name: maestro-portable-linux-${{ matrix.arch }}
+          path: release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Windows portable EXE
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v6
+        with:
+          name: maestro-portable-windows-x64
+          path: release/*Portable*.exe
+          if-no-files-found: error
+          retention-days: 7
