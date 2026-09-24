@@ -1465,6 +1465,8 @@ interface MaestroAPI {
 			cwd: string,
 			sshRemoteId?: string
 		) => Promise<{
+			success?: boolean;
+			error?: string;
 			worktrees: Array<{
 				path: string;
 				head: string;

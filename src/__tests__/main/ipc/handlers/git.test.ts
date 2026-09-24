@@ -5000,6 +5000,83 @@ branch refs/heads/bugfix-123
 			expect(result.scanFailed).toBe(true);
 		});
 
+		it('should run every SSH git check in the discovered worktree directory', async () => {
+			const remotePath = '/remote/worktrees/feature';
+			mockSettingsStore.get.mockReturnValue([
+				{ id: 'ssh-1', host: 'remote.example.com', user: 'me' },
+			]);
+
+			const remoteFs = await import('../../../../main/utils/remote-fs');
+			vi.mocked(remoteFs.readDirRemote).mockImplementation(async (dir) => ({
+				success: true,
+				data:
+					String(dir) === '/remote/worktrees'
+						? [{ name: 'feature', isDirectory: true }]
+						: [],
+			}) as any);
+
+			const remoteGit = await import('../../../../main/utils/remote-git');
+			vi.mocked(remoteGit.execGit).mockImplementation(async (args, _localCwd, _sshRemote, remoteCwd) => {
+				if (remoteCwd !== remotePath) {
+					return { stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 };
+				}
+				if (args.includes('--is-inside-work-tree'))
+					return { stdout: 'true\n', stderr: '', exitCode: 0 };
+				if (args.includes('--show-toplevel'))
+					return { stdout: `${remotePath}\n`, stderr: '', exitCode: 0 };
+				if (args.includes('--git-dir'))
+					return { stdout: '/remote/repo/.git/worktrees/feature\n', stderr: '', exitCode: 0 };
+				if (args.includes('--git-common-dir'))
+					return { stdout: '/remote/repo/.git\n', stderr: '', exitCode: 0 };
+				return { stdout: 'feature\n', stderr: '', exitCode: 0 };
+			});
+
+			const handler = handlers.get('git:scanWorktreeDirectory');
+			const result = await handler!({} as any, '/remote/worktrees', 'ssh-1');
+
+			expect(result.gitSubdirs).toEqual([
+				{
+					path: remotePath,
+					name: 'feature',
+					isWorktree: true,
+					branch: 'feature',
+					repoRoot: '/remote/repo',
+				},
+			]);
+			expect(remoteGit.execGit).toHaveBeenCalledTimes(5);
+			for (const call of vi.mocked(remoteGit.execGit).mock.calls) {
+				expect(call[3]).toBe(remotePath);
+			}
+		});
+
+		it('should not classify an SSH worktree as another repo when common-dir lookup fails', async () => {
+			mockSettingsStore.get.mockReturnValue([
+				{ id: 'ssh-1', host: 'remote.example.com', user: 'me' },
+			]);
+			const remoteFs = await import('../../../../main/utils/remote-fs');
+			vi.mocked(remoteFs.readDirRemote).mockImplementation(async (dir) => ({
+				success: true,
+				data: String(dir) === '/remote/worktrees' ? [{ name: 'feature', isDirectory: true }] : [],
+			}) as any);
+			const remoteGit = await import('../../../../main/utils/remote-git');
+			vi.mocked(remoteGit.execGit).mockImplementation(async (args) => {
+				if (args.includes('--is-inside-work-tree'))
+					return { stdout: 'true\n', stderr: '', exitCode: 0 };
+				if (args.includes('--show-toplevel'))
+					return { stdout: '/remote/worktrees/feature\n', stderr: '', exitCode: 0 };
+				if (args.includes('--git-dir'))
+					return { stdout: '/remote/repo/.git/worktrees/feature\n', stderr: '', exitCode: 0 };
+				if (args.includes('--git-common-dir'))
+					return { stdout: '', stderr: 'temporary SSH failure', exitCode: 1 };
+				return { stdout: 'feature\n', stderr: '', exitCode: 0 };
+			});
+
+			const handler = handlers.get('git:scanWorktreeDirectory');
+			const result = await handler!({} as any, '/remote/worktrees', 'ssh-1');
+
+			expect(result.gitSubdirs).toEqual([]);
+		});
+
 		it('should swallow read errors on nested group directories', async () => {
 			// If recursing into a group dir fails (perms, race with deletion), the
 			// rest of the scan must still succeed. Without this, a transient

@@ -361,22 +361,22 @@ describe('remote-git.ts', () => {
 			});
 		});
 
-		it('should handle empty output (no worktrees)', async () => {
+		it('should report empty output as an invalid worktree listing', async () => {
 			mockExecFileNoThrow.mockResolvedValue(successResult(''));
 
 			const result = await listWorktreesRemote('/repo', sshRemote);
 
-			expect(result.success).toBe(true);
-			expect(result.data).toEqual([]);
+			expect(result.success).toBe(false);
+			expect(result.error).toBe('git worktree list returned no worktrees');
 		});
 
-		it('should return empty array on command failure', async () => {
+		it('should report command failure instead of an empty worktree listing', async () => {
 			mockExecFileNoThrow.mockResolvedValue(failResult('fatal: not a git repository', 128));
 
 			const result = await listWorktreesRemote('/not-a-repo', sshRemote);
 
-			expect(result.success).toBe(true);
-			expect(result.data).toEqual([]);
+			expect(result.success).toBe(false);
+			expect(result.error).toBe('fatal: not a git repository');
 		});
 
 		it('should handle single worktree entry with trailing blank line', async () => {
@@ -574,26 +574,20 @@ describe('remote-git.ts', () => {
 			expect(result.error).toBe('Failed to get git directory');
 		});
 
-		it('should fall back to gitDir when git-common-dir check fails', async () => {
+		it('should not misclassify a worktree when git-common-dir check fails', async () => {
 			// Check path exists
 			mockExecFileNoThrow.mockResolvedValueOnce(successResult('EXISTS'));
 			// rev-parse --is-inside-work-tree
 			mockExecFileNoThrow.mockResolvedValueOnce(successResult('true'));
 			// rev-parse --git-dir
 			mockExecFileNoThrow.mockResolvedValueOnce(successResult('.git\n'));
-			// rev-parse --git-common-dir fails (old git version)
+			// A transient failure must not make this path look like a standalone repo.
 			mockExecFileNoThrow.mockResolvedValueOnce(failResult('unknown option', 1));
-			// gitDir == gitCommonDir (fallback), so isWorktree = false
-			// rev-parse --abbrev-ref HEAD
-			mockExecFileNoThrow.mockResolvedValueOnce(successResult('develop\n'));
-			// rev-parse --show-toplevel
-			mockExecFileNoThrow.mockResolvedValueOnce(successResult('/project\n'));
 
 			const result = await worktreeInfoRemote('/project', sshRemote);
 
-			expect(result.success).toBe(true);
-			expect(result.data!.isWorktree).toBe(false);
-			expect(result.data!.currentBranch).toBe('develop');
+			expect(result.success).toBe(false);
+			expect(result.error).toBe('Failed to get git common directory');
 		});
 	});
 

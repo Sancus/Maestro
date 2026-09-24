@@ -164,6 +164,62 @@ async function resolveRepoRoot(path: string, sshRemoteId?: string): Promise<stri
 	}
 }
 
+/** Use Git's complete worktree registry for SSH scans instead of probing folders individually. */
+async function scanConfiguredWorktrees(
+	parentSession: Session,
+	basePath: string,
+	sshRemoteId?: string
+): Promise<Awaited<ReturnType<typeof window.maestro.git.scanWorktreeDirectory>>> {
+	if (!sshRemoteId) {
+		return window.maestro.git.scanWorktreeDirectory(basePath, sshRemoteId);
+	}
+
+	const result = await window.maestro.git.listWorktrees(parentSession.cwd, sshRemoteId);
+	if (result.success === false || !Array.isArray(result.worktrees)) {
+		throw new Error(result.error || 'Could not list remote worktrees');
+	}
+
+	const base = normalizePath(basePath);
+	const parent = normalizePath(parentSession.cwd);
+	return {
+		gitSubdirs: result.worktrees
+			.filter((worktree) => {
+				const worktreePath = normalizePath(worktree.path);
+				return (
+					!worktree.isBare &&
+					worktreePath !== parent &&
+					(worktreePath === base || worktreePath.startsWith(`${base}/`))
+				);
+			})
+			.map((worktree) => ({
+				path: worktree.path,
+				name: normalizePath(worktree.path).split('/').pop() || worktree.path,
+				isWorktree: true,
+				branch: worktree.branch,
+				repoRoot: null,
+			})),
+	};
+}
+
+/** Keep the Git branch separate from the name shown for a worktree agent. */
+function worktreeFolderName(path: string): string {
+	return normalizePath(path).split('/').filter(Boolean).pop() || path;
+}
+
+/** Migrate only sessions that were automatically named after their branch. */
+function restoreWorktreeFolderName(session: Session, path: string, branch?: string | null): void {
+	const folderName = worktreeFolderName(path);
+	if (
+		branch &&
+		session.worktreeBranch === branch &&
+		session.name === branch &&
+		session.name !== folderName &&
+		normalizePath(session.cwd) === normalizePath(path)
+	) {
+		useSessionStore.getState().updateSession(session.id, { name: folderName });
+	}
+}
+
 // buildWorktreeSession and BuildWorktreeSessionParams are imported from ../../utils/worktreeSession
 // normalizePath and sessionMatchesWorktreeRoot are imported from ../../utils/worktreeDedup
 
@@ -275,10 +331,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 		// Scan for worktrees and create sub-agent sessions
 		const parentSshRemoteId = getSshRemoteId(activeSession);
 		try {
-			const scanResult = await window.maestro.git.scanWorktreeDirectory(
-				config.basePath,
-				parentSshRemoteId
-			);
+			const scanResult = await scanConfiguredWorktrees(activeSession, config.basePath, parentSshRemoteId);
 			const { gitSubdirs } = scanResult;
 
 			if (gitSubdirs.length > 0) {
@@ -287,7 +340,9 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 				// Same repo-identity guard as scanWorktreeConfigs: if the user just
 				// pointed this agent at a basePath that contains worktrees from a
 				// different repo, skip those subdirs instead of attaching them.
-				const parentRepoRoot = await resolveRepoRoot(activeSession.cwd, parentSshRemoteId);
+				const parentRepoRoot = parentSshRemoteId
+					? null // Git's SSH worktree list is already scoped to this repository.
+					: await resolveRepoRoot(activeSession.cwd);
 
 				for (const subdir of gitSubdirs) {
 					// Skip main/master/HEAD branches - they're typically the main repo
@@ -317,7 +372,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 					const existingByBranch = latestSessions.find(
 						(s) => s.parentSessionId === activeSession.id && s.worktreeBranch === subdir.branch
 					);
-					if (existingByBranch) continue;
+					if (existingByBranch) {
+						restoreWorktreeFolderName(existingByBranch, subdir.path, subdir.branch);
+						continue;
+					}
 
 					// Also check by path (normalize for comparison), scoped to this parent.
 					const normalizedSubdirPath = normalizePath(subdir.path);
@@ -326,7 +384,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 							s.parentSessionId === activeSession.id &&
 							normalizePath(s.cwd) === normalizedSubdirPath
 					);
-					if (existingByPath) continue;
+					if (existingByPath) {
+						restoreWorktreeFolderName(existingByPath, subdir.path, subdir.branch);
+						continue;
+					}
 
 					const gitInfo = await fetchGitInfo(subdir.path, parentSshRemoteId);
 
@@ -335,7 +396,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 							parentSession: activeSession,
 							path: subdir.path,
 							branch: subdir.branch,
-							name: subdir.branch || subdir.name,
+							name: worktreeFolderName(subdir.path),
 							defaultSaveToHistory: savToHist,
 							defaultShowThinking: showThink,
 							...gitInfo,
@@ -488,7 +549,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 					parentSession: activeSession,
 					path: actualPath,
 					branch: branchName,
-					name: branchName,
+					name: worktreeFolderName(actualPath),
 					defaultSaveToHistory: savToHist,
 					defaultShowThinking: showThink,
 					...gitInfo,
@@ -614,7 +675,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 				parentSession: createWtSession,
 				path: actualPath,
 				branch: branchName,
-				name: branchName,
+					name: worktreeFolderName(actualPath),
 				defaultSaveToHistory: savToHist,
 				defaultShowThinking: showThink,
 				...gitInfo,
@@ -752,7 +813,8 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 		for (const parentSession of sessionsWithWorktreeConfig) {
 			try {
 				const sshRemoteId = getSshRemoteId(parentSession);
-				const scanResult = await window.maestro.git.scanWorktreeDirectory(
+				const scanResult = await scanConfiguredWorktrees(
+					parentSession,
 					parentSession.worktreeConfig!.basePath,
 					sshRemoteId
 				);
@@ -764,7 +826,9 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 				// worktrees from a different repo) would race - whichever parent's loop
 				// iterates first would grab every worktree, producing the "worktrees
 				// re-added under a wrong agent" bug after a wipe + restart.
-				const parentRepoRoot = await resolveRepoRoot(parentSession.cwd, sshRemoteId);
+				const parentRepoRoot = sshRemoteId
+					? null // Git's SSH worktree list is already scoped to this repository.
+					: await resolveRepoRoot(parentSession.cwd);
 
 				// Detect additions
 				for (const subdir of gitSubdirs) {
@@ -815,7 +879,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 							s.worktreeBranch === subdir.branch
 						);
 					});
-					if (existingSession) continue;
+						if (existingSession) {
+							restoreWorktreeFolderName(existingSession, subdir.path, subdir.branch);
+							continue;
+						}
 
 					if (
 						newWorktreeSessions.some(
@@ -834,7 +901,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 							parentSession,
 							path: subdir.path,
 							branch: subdir.branch,
-							name: subdir.branch || subdir.name,
+							name: worktreeFolderName(subdir.path),
 							defaultSaveToHistory: savToHist,
 							defaultShowThinking: showThink,
 							...gitInfo,
@@ -869,7 +936,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 					const childSessions = latestSessions.filter(
 						(s) => s.parentSessionId === parentSession.id
 					);
-					if (gitSubdirs.length === 0 && childSessions.length > 0) {
+					if (gitSubdirs.length === 0 && childSessions.length > 0 && !sshRemoteId) {
 						logger.warn(
 							`[WorktreeScan] Skipping removal phase for ${parentSession.worktreeConfig!.basePath} - scan returned zero subdirs but ${childSessions.length} child sessions exist (suspicious)`
 						);
@@ -877,7 +944,22 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 						for (const child of childSessions) {
 							const childPath = normalizePath(child.cwd);
 							if (!diskPaths.has(childPath)) {
-								staleSessionIds.push(child.id);
+								// A successful SSH worktree list is authoritative. Local
+								// directory scans can be partial, so verify those misses.
+								if (sshRemoteId) {
+									staleSessionIds.push(child.id);
+									continue;
+								}
+								try {
+									const stat = await window.maestro.fs.stat(child.cwd, sshRemoteId);
+									if (!stat?.isDirectory) staleSessionIds.push(child.id);
+								} catch (err) {
+									logger.warn(
+										`[WorktreeScan] Could not verify ${child.cwd}; preserving its agent`,
+										undefined,
+										err
+									);
+								}
 								continue;
 							}
 							// Detach children whose cwd points at a worktree of a different
@@ -890,10 +972,15 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 								subdirRepoRoot &&
 								normalizePath(subdirRepoRoot) !== parentRepoRoot
 							) {
-								logger.warn(
-									`[WorktreeScan] Detaching ${child.id} from ${parentSession.id}: child cwd ${child.cwd} belongs to repo ${subdirRepoRoot}, not parent's repo ${parentRepoRoot}`
-								);
-								reassignedSessionIds.push(child.id);
+								// Verify directly before detaching a chat-bearing agent. A
+								// transient git-common-dir failure can misclassify this path.
+								const verifiedRoot = await resolveRepoRoot(child.cwd, sshRemoteId);
+								if (verifiedRoot && verifiedRoot !== parentRepoRoot) {
+									logger.warn(
+										`[WorktreeScan] Detaching ${child.id} from ${parentSession.id}: child cwd ${child.cwd} belongs to repo ${verifiedRoot}, not parent's repo ${parentRepoRoot}`
+									);
+									reassignedSessionIds.push(child.id);
+								}
 							}
 						}
 					}
@@ -996,7 +1083,11 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 		// Start chokidar watchers, logging failures so they don't go silent
 		for (const session of watchableSessions) {
 			window.maestro.git
-				.watchWorktreeDirectory(session.id, session.worktreeConfig!.basePath)
+				.watchWorktreeDirectory(
+					session.id,
+					session.worktreeConfig!.basePath,
+					getSshRemoteId(session)
+				)
 				.then((result) => {
 					logger.warn(`[WT-DEBUG] watchWorktreeDirectory result:`, undefined, result);
 					if (!result.success) {
@@ -1048,7 +1139,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 					(sessionMatchesWorktreeRoot(s, normalizedWorktreePath) ||
 						s.worktreeBranch === worktree.branch)
 			);
-			if (existingForParent) return;
+			if (existingForParent) {
+				restoreWorktreeFolderName(existingForParent, worktree.path, worktree.branch);
+				return;
+			}
 
 			const sshRemoteId = getSshRemoteId(parentSession);
 
@@ -1098,7 +1192,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 				parentSession,
 				path: worktree.path,
 				branch: worktree.branch,
-				name: worktree.branch || worktree.name,
+				name: worktreeFolderName(worktree.path),
 				defaultSaveToHistory: savToHist,
 				defaultShowThinking: showThink,
 				...gitInfo,
