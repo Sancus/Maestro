@@ -52,6 +52,21 @@ describe('path-prober', () => {
 	});
 
 	describe('getExpandedEnv', () => {
+		it('preserves mixed-case Windows Path without duplicate environment keys', () => {
+			const originalEnv = process.env;
+			const originalPlatform = process.platform;
+			Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+			process.env = { Path: 'C:\\custom-tools', SYSTEMROOT: 'C:\\Windows' };
+			try {
+				const env = getExpandedEnv();
+				expect(env.PATH).toContain('C:\\custom-tools');
+				expect(Object.keys(env).filter((key) => key.toLowerCase() === 'path')).toEqual(['PATH']);
+			} finally {
+				process.env = originalEnv;
+				Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+			}
+		});
+
 		it('should return environment with PATH', () => {
 			const env = getExpandedEnv();
 			expect(env.PATH).toBeDefined();
@@ -373,7 +388,37 @@ describe('path-prober', () => {
 		});
 
 		afterEach(() => {
-			accessMock.mockRestore();
+			vi.restoreAllMocks();
+		});
+
+		it('finds the newest desktop Codex binary and skips incomplete installations', async () => {
+			vi.spyOn(fs.promises, 'readdir').mockResolvedValue(
+				['old-hash', 'incomplete-hash', 'new-hash'].map((name) => ({
+					name,
+					isDirectory: () => true,
+				})) as fs.Dirent[]
+			);
+			vi.spyOn(fs.promises, 'stat').mockImplementation(async (file) => {
+				const filename = String(file);
+				if (filename.includes('incomplete-hash'))
+					throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+				return { isFile: () => true, birthtimeMs: filename.includes('new-hash') ? 20 : 10 } as fs.Stats;
+			});
+			accessMock.mockImplementation(async (file) => {
+				if (!String(file).includes('-hash')) throw new Error('ENOENT');
+			});
+			const result = await probeWindowsPaths('codex');
+			expect(result).toContain(path.join('OpenAI', 'Codex', 'bin', 'new-hash', 'codex.exe'));
+		});
+
+		it('falls back to normal installations if the desktop directory is absent', async () => {
+			vi.spyOn(fs.promises, 'readdir').mockRejectedValue(
+				Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+			);
+			accessMock.mockImplementation(async (file) => {
+				if (!String(file).endsWith('codex.cmd')) throw new Error('ENOENT');
+			});
+			expect(await probeWindowsPaths('codex')).toMatch(/codex\.cmd$/);
 		});
 
 		it('should return null for unknown binary', async () => {

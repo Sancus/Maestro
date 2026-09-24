@@ -127,6 +127,8 @@ export function getExpandedEnv(): NodeJS.ProcessEnv {
 			path.join(appData, 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'cli'),
 			// Codex CLI install location (npm global)
 			path.join(appData, 'npm', 'node_modules', '@openai', 'codex', 'bin'),
+			// Codex Windows installer
+			path.join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin'),
 			// User local programs
 			path.join(localAppData, 'Programs'),
 			path.join(localAppData, 'Microsoft', 'WindowsApps'),
@@ -182,7 +184,16 @@ export function getExpandedEnv(): NodeJS.ProcessEnv {
 		];
 	}
 
-	const currentPath = env.PATH || '';
+	// Spreading process.env loses Windows' case-insensitive property lookup.
+	// Keep one PATH key so child_process cannot choose a stale `Path` entry.
+	const pathKeys = Object.keys(env).filter((key) =>
+		isWindows() ? key.toLowerCase() === 'path' : key === 'PATH'
+	);
+	const currentPath = pathKeys
+		.map((key) => env[key])
+		.filter(Boolean)
+		.join(path.delimiter);
+	for (const key of pathKeys) delete env[key];
 	// Use platform-appropriate path delimiter
 	const pathParts = currentPath.split(path.delimiter);
 
@@ -365,7 +376,9 @@ function getWindowsKnownPaths(binaryName: string): string[] {
 			path.join(localAppData, 'Microsoft', 'WindowsApps', 'claude.exe'),
 		],
 		codex: [
-			// npm global installation (primary method for Codex)
+			// Codex Windows installer. Prefer its executable over older npm wrappers.
+			path.join(localAppData, 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'),
+			// npm global installation
 			...npmGlobal('codex'),
 			// Possible standalone in future
 			...localBin('codex'),
