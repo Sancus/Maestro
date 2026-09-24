@@ -57,6 +57,7 @@ import type { Session } from '../../../renderer/types';
 
 const mockGit = {
 	scanWorktreeDirectory: vi.fn().mockResolvedValue({ gitSubdirs: [] }),
+	listWorktrees: vi.fn().mockResolvedValue({ success: true, worktrees: [] }),
 	watchWorktreeDirectory: vi.fn().mockResolvedValue({ success: true }),
 	unwatchWorktreeDirectory: vi.fn(),
 	onWorktreeDiscovered: vi.fn().mockReturnValue(() => {}),
@@ -66,6 +67,10 @@ const mockGit = {
 	// Default: not a git repo. Tests that exercise the repoRoot filter override
 	// this per-test to return matching/mismatching repoRoots.
 	worktreeInfo: vi.fn().mockResolvedValue({ success: true, exists: false, isWorktree: false }),
+};
+
+const mockFs = {
+	stat: vi.fn().mockResolvedValue(null),
 };
 
 const mockParentSession = {
@@ -176,6 +181,7 @@ beforeEach(() => {
 		(window.maestro as any).git = {};
 	}
 	Object.assign((window.maestro as any).git, mockGit);
+	(window.maestro as any).fs = { ...(window.maestro as any).fs, ...mockFs };
 });
 
 afterEach(() => {
@@ -418,6 +424,32 @@ describe('handleSaveWorktreeConfig', () => {
 		expect(sessions.length).toBe(3);
 		expect(sessions.some((s) => s.worktreeBranch === 'feature-1')).toBe(true);
 		expect(sessions.some((s) => s.worktreeBranch === 'feature-2')).toBe(true);
+	});
+
+	it('uses the worktree folder name when the branch has a different name', async () => {
+		useSessionStore.setState({
+			sessions: [{ ...mockParentSession, worktreeConfig: undefined }],
+			activeSessionId: 'parent-1',
+		} as any);
+		mockGit.scanWorktreeDirectory.mockResolvedValueOnce({
+			gitSubdirs: [{
+				path: '/projects/worktrees/stormbox-tags',
+				branch: 'message-tags',
+				name: 'stormbox-tags',
+			}],
+		});
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+		await act(async () => {
+			await result.current.handleSaveWorktreeConfig({
+				basePath: '/projects/worktrees',
+				watchEnabled: false,
+			});
+		});
+
+		const child = useSessionStore.getState().sessions.find((s) => s.worktreeBranch === 'message-tags');
+		expect(child?.name).toBe('stormbox-tags');
+		expect(child?.cwd).toBe('/projects/worktrees/stormbox-tags');
 	});
 
 	it('skips main/master/HEAD branches', async () => {
@@ -1284,9 +1316,15 @@ describe('Session inheritance via buildWorktreeSession', () => {
 			activeSessionId: 'parent-1',
 		} as any);
 
-		mockGit.scanWorktreeDirectory.mockResolvedValueOnce({
-			gitSubdirs: [
-				{ path: '/projects/worktrees/feature-ssh', branch: 'feature-ssh', name: 'feature-ssh' },
+		mockGit.listWorktrees.mockResolvedValueOnce({
+			success: true,
+			worktrees: [
+				{
+					path: '/projects/worktrees/feature-ssh',
+					branch: 'feature-ssh',
+					head: 'abc',
+					isBare: false,
+				},
 			],
 		});
 
@@ -1384,6 +1422,112 @@ describe('Effects', () => {
 			expect(worktreeSessions.length).toBe(2);
 		});
 
+		it('uses the complete SSH git list, including detached worktrees', async () => {
+			vi.useFakeTimers();
+			const parent = {
+				...mockParentSession,
+				cwd: '/remote/repo',
+				worktreeConfig: { basePath: '/remote/worktrees', watchEnabled: false },
+				sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+			};
+			const removedChild = createChildSession({
+				id: 'removed-child',
+				cwd: '/remote/worktrees/removed',
+			});
+			mockGit.listWorktrees.mockResolvedValueOnce({
+				success: true,
+				worktrees: [
+					{ path: '/remote/repo', branch: 'main', head: 'abc', isBare: false },
+					{ path: '/remote/worktrees/stormbox-tags', branch: 'message-tags', head: 'abc', isBare: false },
+					{ path: '/remote/worktrees/review-a', branch: null, head: 'abc', isBare: false },
+					{ path: '/remote/worktrees/review-b', branch: null, head: 'abc', isBare: false },
+					{ path: '/tmp/outside', branch: null, head: 'abc', isBare: false },
+				],
+			});
+			useSessionStore.setState({
+				sessions: [parent, removedChild],
+				sessionsLoaded: true,
+			} as any);
+
+			renderHook(() => useWorktreeHandlers());
+			await act(async () => {
+				await vi.runAllTimersAsync();
+			});
+
+			expect(mockGit.listWorktrees).toHaveBeenCalledWith('/remote/repo', 'ssh-1');
+			expect(mockGit.scanWorktreeDirectory).not.toHaveBeenCalled();
+			const children = useSessionStore.getState().sessions.filter((s) => s.parentSessionId === 'parent-1');
+			expect(children.map((s) => s.cwd).sort()).toEqual([
+				'/remote/worktrees/review-a',
+				'/remote/worktrees/review-b',
+				'/remote/worktrees/stormbox-tags',
+			]);
+			expect(children.find((s) => s.worktreeBranch === 'message-tags')?.name).toBe('stormbox-tags');
+			expect(children.find((s) => s.cwd.endsWith('review-b'))?.name).toBe('review-b');
+		});
+
+		it('renames old branch-named worktree sessions but preserves custom names', async () => {
+			vi.useFakeTimers();
+			const parent = {
+				...mockParentSession,
+				cwd: '/remote/repo',
+				worktreeConfig: { basePath: '/remote/worktrees', watchEnabled: false },
+				sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+			};
+			const oldChild = createChildSession({
+				id: 'old-child', name: 'message-tags', worktreeBranch: 'message-tags',
+				cwd: '/remote/worktrees/stormbox-tags',
+			});
+			const customChild = createChildSession({
+				id: 'custom-child', name: 'My tags agent', worktreeBranch: 'other-tags',
+				cwd: '/remote/worktrees/stormbox-other-tags',
+			});
+			mockGit.listWorktrees.mockResolvedValueOnce({
+				success: true,
+				worktrees: [
+					{ path: '/remote/worktrees/stormbox-tags', branch: 'message-tags', head: 'abc', isBare: false },
+					{ path: '/remote/worktrees/stormbox-other-tags', branch: 'other-tags', head: 'abc', isBare: false },
+				],
+			});
+			useSessionStore.setState({ sessions: [parent, oldChild, customChild], sessionsLoaded: true } as any);
+
+			renderHook(() => useWorktreeHandlers());
+			await act(async () => { await vi.runAllTimersAsync(); });
+
+			const sessions = useSessionStore.getState().sessions;
+			expect(sessions.find((s) => s.id === 'old-child')?.name).toBe('stormbox-tags');
+			expect(sessions.find((s) => s.id === 'custom-child')?.name).toBe('My tags agent');
+		});
+
+		it('preserves SSH worktree chats when git listing fails', async () => {
+			vi.useFakeTimers();
+			const child = createChildSession({
+				id: 'existing-remote-child',
+				cwd: '/remote/worktrees/feature',
+			});
+			const parent = {
+				...mockParentSession,
+				cwd: '/remote/repo',
+				worktreeConfig: { basePath: '/remote/worktrees', watchEnabled: false },
+				sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+			};
+			mockGit.listWorktrees.mockResolvedValueOnce({
+				success: false,
+				error: 'SSH disconnected',
+			});
+			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
+
+			renderHook(() => useWorktreeHandlers());
+			await act(async () => {
+				await vi.runAllTimersAsync();
+			});
+
+			expect(useSessionStore.getState().sessions).toContain(child);
+			expect(notifyToast).not.toHaveBeenCalledWith(
+				expect.objectContaining({ title: 'Worktree Removed' })
+			);
+		});
+
 		it('skips existing sessions on startup scan', async () => {
 			vi.useFakeTimers();
 
@@ -1478,6 +1622,37 @@ describe('Effects', () => {
 			expect(sessions.some((s) => s.id === 'valid-child')).toBe(true);
 			expect(notifyToast).toHaveBeenCalledWith(
 				expect.objectContaining({ type: 'info', title: 'Worktree Removed' })
+			);
+		});
+
+		it('preserves a chat-bearing child when a partial scan misses its existing directory', async () => {
+			vi.useFakeTimers();
+			const child = createChildSession({
+				id: 'existing-child',
+				cwd: '/projects/worktrees/feature-1',
+				aiTabs: [{ id: 'existing-chat', agentSessionId: 'codex-session' }],
+			});
+			mockGit.scanWorktreeDirectory.mockResolvedValue({
+				gitSubdirs: [{ path: '/projects/worktrees/other', branch: 'other', name: 'other' }],
+			});
+			mockFs.stat.mockResolvedValue({ isDirectory: true });
+			useSessionStore.setState({
+				sessions: [
+					{ ...mockParentSession, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false } },
+					child,
+				],
+				sessionsLoaded: true,
+			} as any);
+
+			renderHook(() => useWorktreeHandlers());
+			await act(async () => {
+				await vi.runAllTimersAsync();
+			});
+
+			expect(mockFs.stat).toHaveBeenCalledWith(child.cwd, undefined);
+			expect(useSessionStore.getState().sessions).toContain(child);
+			expect(notifyToast).not.toHaveBeenCalledWith(
+				expect.objectContaining({ title: 'Worktree Removed' })
 			);
 		});
 
@@ -1790,9 +1965,28 @@ describe('Effects', () => {
 
 			expect(mockGit.watchWorktreeDirectory).toHaveBeenCalledWith(
 				'parent-1',
-				'/projects/worktrees'
+				'/projects/worktrees',
+				undefined
 			);
 			expect(mockGit.onWorktreeDiscovered).toHaveBeenCalled();
+		});
+
+		it('passes the remote ID so SSH worktree folders are not watched locally', () => {
+			useSessionStore.setState({
+				sessions: [{
+					...mockParentSession,
+					sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+				}],
+				sessionsLoaded: false,
+			} as any);
+
+			renderHook(() => useWorktreeHandlers());
+
+			expect(mockGit.watchWorktreeDirectory).toHaveBeenCalledWith(
+				'parent-1',
+				'/projects/worktrees',
+				'ssh-1'
+			);
 		});
 
 		it('cleans up watchers on unmount', () => {
@@ -1919,7 +2113,11 @@ describe('Effects', () => {
 			// Watcher should have been torn down and restarted with new path
 			expect(mockGit.unwatchWorktreeDirectory).toHaveBeenCalledWith('parent-1');
 			expect(mockGit.watchWorktreeDirectory).toHaveBeenCalledTimes(2);
-			expect(mockGit.watchWorktreeDirectory).toHaveBeenLastCalledWith('parent-1', '/new/worktrees');
+			expect(mockGit.watchWorktreeDirectory).toHaveBeenLastCalledWith(
+				'parent-1',
+				'/new/worktrees',
+				undefined
+			);
 		});
 
 		it('DOES restart watcher when a new parent session gets worktreeConfig', () => {
@@ -1956,7 +2154,8 @@ describe('Effects', () => {
 			expect(mockGit.watchWorktreeDirectory).toHaveBeenCalledTimes(3); // 1 initial + 2 on re-run
 			expect(mockGit.watchWorktreeDirectory).toHaveBeenCalledWith(
 				'parent-2',
-				'/projects/other-worktrees'
+				'/projects/other-worktrees',
+				undefined
 			);
 		});
 
@@ -2283,12 +2482,19 @@ describe('Effects', () => {
 				parentSessionId: 'parent-1',
 			});
 
-			mockGit.worktreeInfo.mockResolvedValueOnce({
-				success: true,
-				exists: true,
-				isWorktree: false,
-				repoRoot: '/repos/repo-a',
-			});
+			mockGit.worktreeInfo
+				.mockResolvedValueOnce({
+					success: true,
+					exists: true,
+					isWorktree: false,
+					repoRoot: '/repos/repo-a',
+				})
+				.mockResolvedValueOnce({
+					success: true,
+					exists: true,
+					isWorktree: true,
+					repoRoot: '/repos/repo-b',
+				});
 
 			mockGit.scanWorktreeDirectory.mockResolvedValue({
 				gitSubdirs: [
@@ -2334,6 +2540,47 @@ describe('Effects', () => {
 			);
 		});
 
+		it('keeps a child when a scan briefly reports the wrong repository root', async () => {
+			vi.useFakeTimers();
+			const child = createChildSession({
+				id: 'chat-bearing-child',
+				cwd: '/shared/worktrees/feature',
+				worktreeBranch: 'feature',
+			});
+			mockGit.scanWorktreeDirectory.mockResolvedValue({
+				gitSubdirs: [{
+					path: child.cwd,
+					branch: 'feature',
+					name: 'feature',
+					repoRoot: child.cwd,
+				}],
+			});
+			mockGit.worktreeInfo.mockResolvedValue({
+				success: true,
+				exists: true,
+				isWorktree: true,
+				repoRoot: '/repos/repo-a',
+			});
+			useSessionStore.setState({
+				sessions: [
+					{ ...mockParentSession, cwd: '/repos/repo-a', worktreeConfig: { basePath: '/shared/worktrees', watchEnabled: false } },
+					child,
+				],
+				sessionsLoaded: true,
+			} as any);
+
+			renderHook(() => useWorktreeHandlers());
+			await act(async () => {
+				await vi.runAllTimersAsync();
+			});
+
+			expect(useSessionStore.getState().sessions).toContain(child);
+			expect(mockGit.worktreeInfo).toHaveBeenCalledWith(child.cwd, undefined);
+			expect(notifyToast).not.toHaveBeenCalledWith(
+				expect.objectContaining({ title: 'Worktree Re-assigned' })
+			);
+		});
+
 		it('attaches wrong-agent child to the correct parent in the same scan pass', async () => {
 			// Regression for the "queued stale children block same-pass reattachment"
 			// edge case: parent-a flags a misattached child for detachment, then
@@ -2369,6 +2616,12 @@ describe('Effects', () => {
 					exists: true,
 					isWorktree: false,
 					repoRoot: '/repos/repo-a',
+				})
+				.mockResolvedValueOnce({
+					success: true,
+					exists: true,
+					isWorktree: true,
+					repoRoot: '/repos/repo-b',
 				})
 				.mockResolvedValueOnce({
 					success: true,

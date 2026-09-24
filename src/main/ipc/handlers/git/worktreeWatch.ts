@@ -116,7 +116,8 @@ export function registerWorktreeWatchHandlers(deps: GitHandlerDependencies): voi
 					const isInsideWorkTree = await execGit(
 						['rev-parse', '--is-inside-work-tree'],
 						subdirPath,
-						sshRemote
+						sshRemote,
+						subdirPath
 					);
 					if (isInsideWorkTree.exitCode !== 0) {
 						return null; // Not a git repo
@@ -128,7 +129,8 @@ export function registerWorktreeWatchHandlers(deps: GitHandlerDependencies): voi
 					const toplevelResult = await execGit(
 						['rev-parse', '--show-toplevel'],
 						subdirPath,
-						sshRemote
+						sshRemote,
+						subdirPath
 					);
 					if (toplevelResult.exitCode !== 0) {
 						return null; // Git command failed - treat as invalid
@@ -151,14 +153,21 @@ export function registerWorktreeWatchHandlers(deps: GitHandlerDependencies): voi
 
 					// Run remaining git commands in parallel for each subdirectory (SSH-aware via execGit)
 					const [gitDirResult, gitCommonDirResult, branchResult] = await Promise.all([
-						execGit(['rev-parse', '--git-dir'], subdirPath, sshRemote),
-						execGit(['rev-parse', '--git-common-dir'], subdirPath, sshRemote),
-						execGit(['rev-parse', '--abbrev-ref', 'HEAD'], subdirPath, sshRemote),
+						execGit(['rev-parse', '--git-dir'], subdirPath, sshRemote, subdirPath),
+						execGit(['rev-parse', '--git-common-dir'], subdirPath, sshRemote, subdirPath),
+						execGit(['rev-parse', '--abbrev-ref', 'HEAD'], subdirPath, sshRemote, subdirPath),
 					]);
 
-					const gitDir = gitDirResult.exitCode === 0 ? gitDirResult.stdout.trim() : '';
-					const gitCommonDir =
-						gitCommonDirResult.exitCode === 0 ? gitCommonDirResult.stdout.trim() : gitDir;
+					if (
+						gitDirResult.exitCode !== 0 ||
+						gitCommonDirResult.exitCode !== 0 ||
+						!gitDirResult.stdout.trim() ||
+						!gitCommonDirResult.stdout.trim()
+					) {
+						return null;
+					}
+					const gitDir = gitDirResult.stdout.trim();
+					const gitCommonDir = gitCommonDirResult.stdout.trim();
 					const isWorktree = gitDir !== gitCommonDir;
 					const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : null;
 

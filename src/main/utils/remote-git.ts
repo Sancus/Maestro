@@ -232,7 +232,7 @@ export async function worktreeInfoRemote(
 		remoteCwd: worktreePath,
 	});
 
-	if (gitDirResult.exitCode !== 0) {
+	if (gitDirResult.exitCode !== 0 || !gitDirResult.stdout.trim()) {
 		return {
 			success: false,
 			error: 'Failed to get git directory',
@@ -246,8 +246,13 @@ export async function worktreeInfoRemote(
 		remoteCwd: worktreePath,
 	});
 
-	const gitCommonDir =
-		gitCommonDirResult.exitCode === 0 ? gitCommonDirResult.stdout.trim() : gitDir;
+	if (gitCommonDirResult.exitCode !== 0 || !gitCommonDirResult.stdout.trim()) {
+		return {
+			success: false,
+			error: 'Failed to get git common directory',
+		};
+	}
+	const gitCommonDir = gitCommonDirResult.stdout.trim();
 
 	// If git-dir and git-common-dir are different, this is a worktree
 	const isWorktree = gitDir !== gitCommonDir;
@@ -690,11 +695,13 @@ export async function listWorktreesRemote(
 	});
 
 	if (result.exitCode !== 0) {
-		// Not a git repo or no worktree support
 		return {
-			success: true,
-			data: [],
+			success: false,
+			error: result.stderr?.trim() || `git worktree list failed: ${result.exitCode}`,
 		};
+	}
+	if (!result.stdout.trim()) {
+		return { success: false, error: 'git worktree list returned no worktrees' };
 	}
 
 	// Parse porcelain output
