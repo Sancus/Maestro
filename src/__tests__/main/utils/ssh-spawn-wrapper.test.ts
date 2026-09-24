@@ -159,4 +159,17 @@ describe('wrapSpawnWithSsh', () => {
 		expect(result.customEnvVars).toEqual({ KEPT: 'value' });
 		expect(mockGetSshRemoteConfig).not.toHaveBeenCalled();
 	});
+
+	it('marks a small SSH prompt as already embedded in the command args', async () => {
+		const result = await wrapSpawnWithSsh(
+			{ ...baseConfig, prompt: 'hello remote' },
+			{ enabled: true, remoteId: 'jennifer-box' },
+			sshStore
+		);
+
+		expect(result.prompt).toBeUndefined();
+		expect(result.promptAlreadyInArgs).toBe(true);
+		expect(mockBuildSshCommand).toHaveBeenCalledTimes(1);
+		expect(mockBuildSshCommandWithStdin).not.toHaveBeenCalled();
+	});
 });

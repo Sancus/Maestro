@@ -104,6 +104,8 @@ export interface SshSpawnWrapResult {
 	customEnvVars?: Record<string, string>;
 	/** The prompt to pass to ProcessManager (undefined for SSH prompts sent via stdinScript) */
 	prompt?: string;
+	/** The original prompt has already been embedded in `args` by the SSH wrapper. */
+	promptAlreadyInArgs?: boolean;
 	/** Script to send via stdin for SSH execution (includes PATH setup + prompt passthrough) */
 	sshStdinScript?: string;
 	/** Human-readable remote agent invocation (shown in Process Details above the SSH command) */
@@ -253,6 +255,7 @@ export async function wrapSpawnWithSsh(
 		cwd: os.homedir(),
 		customEnvVars: undefined,
 		prompt: undefined,
+		promptAlreadyInArgs: !!config.prompt,
 		sshRemoteCommand: sshCommand.remoteCommandLine,
 		sshRemoteUsed: sshResult.config,
 	};

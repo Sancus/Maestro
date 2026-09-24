@@ -46,6 +46,8 @@ export interface IProcessManager {
 		sshStdinScript?: string;
 		/** Human-readable remote agent invocation (shown in Process Details for SSH spawns) */
 		sshRemoteCommand?: string;
+		/** Prompt was embedded in SSH command args and still requires batch stdin closure. */
+		promptAlreadyInArgs?: boolean;
 	}): { pid: number; success: boolean };
 
 	write(sessionId: string, data: string): boolean;

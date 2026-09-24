@@ -46,6 +46,8 @@ export interface GroomingProcessManager {
 		sshStdinScript?: string;
 		// Human-readable remote agent invocation (shown in Process Details)
 		sshRemoteCommand?: string;
+		// Prompt was embedded in SSH command args and still requires batch stdin closure
+		promptAlreadyInArgs?: boolean;
 		// Resolved SSH remote identity, for Process Details / logging
 		sshRemoteId?: string;
 		sshRemoteHost?: string;
@@ -303,6 +305,7 @@ export async function groomContext(
 	let spawnEnvVars = resolvedEnvVars;
 	let sshStdinScript: string | undefined;
 	let sshRemoteCommand: string | undefined;
+	let promptAlreadyInArgs = false;
 	let sshRemoteUsed: SshRemoteConfig | null = null;
 
 	if (sessionSshRemoteConfig?.enabled) {
@@ -353,6 +356,7 @@ export async function groomContext(
 		spawnEnvVars = wrapped.customEnvVars;
 		sshStdinScript = wrapped.sshStdinScript;
 		sshRemoteCommand = wrapped.sshRemoteCommand;
+		promptAlreadyInArgs = !!wrapped.promptAlreadyInArgs;
 		sshRemoteUsed = wrapped.sshRemoteUsed;
 
 		logger.info('Grooming will run on SSH remote', LOG_CONTEXT, {
@@ -517,6 +521,7 @@ export async function groomContext(
 			// SSH remote execution (undefined for local spawns)
 			sshStdinScript,
 			sshRemoteCommand,
+			promptAlreadyInArgs,
 			sshRemoteId: sshRemoteUsed?.id,
 			sshRemoteHost: sshRemoteUsed?.host,
 			// Pass resolved env vars (merged from agent defaults + agent config + session overrides)

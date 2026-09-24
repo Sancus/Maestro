@@ -192,6 +192,7 @@ describe('spawnGroupChatAgent', () => {
 				args: ['user@host', 'claude --print'],
 				cwd: '/Users/local/home',
 				prompt: undefined,
+				promptAlreadyInArgs: true,
 				customEnvVars: undefined,
 				sshRemoteUsed: { id: 'jennifer-box', name: 'Jennifer', host: 'host' },
 			});
@@ -210,8 +211,12 @@ describe('spawnGroupChatAgent', () => {
 			});
 
 			expect(spawnSpy).toHaveBeenCalledTimes(1);
-			const spawned = spawnSpy.mock.calls[0][0] as { command: string };
+			const spawned = spawnSpy.mock.calls[0][0] as {
+				command: string;
+				promptAlreadyInArgs: boolean;
+			};
 			expect(spawned.command).toBe('ssh');
+			expect(spawned.promptAlreadyInArgs).toBe(true);
 		});
 	});
 });
