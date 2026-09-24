@@ -101,25 +101,23 @@ export const ModelEffortPills = memo(function ModelEffortPills({
 						>
 							<ShortcutHint theme={theme} keys={shortcutKeys ?? []} label="Try:" variant="row" />
 							<div className="max-h-48 overflow-y-auto scrollbar-thin">
-								{(availableModels.includes('') ? availableModels : ['', ...availableModels]).map(
-									(model) => (
-										<button
-											key={model || '__default__'}
-											onClick={() => {
-												onModelChange(model);
-												setModelMenuOpen(false);
-											}}
-											className="w-full text-left px-3 py-1.5 text-xs font-mono whitespace-nowrap hover:bg-white/10 transition-colors"
-											style={{
-												color: model === currentModel ? theme.colors.accent : theme.colors.textMain,
-												backgroundColor:
-													model === currentModel ? 'rgba(255,255,255,0.05)' : undefined,
-											}}
-										>
-											{model || '(default)'}
-										</button>
-									)
-								)}
+								{availableModels.filter(Boolean).map((model) => (
+									<button
+										key={model || '__default__'}
+										onClick={() => {
+											onModelChange(model);
+											setModelMenuOpen(false);
+										}}
+										className="w-full text-left px-3 py-1.5 text-xs font-mono whitespace-nowrap hover:bg-white/10 transition-colors"
+										style={{
+											color: model === currentModel ? theme.colors.accent : theme.colors.textMain,
+											backgroundColor:
+												model === currentModel ? 'rgba(255,255,255,0.05)' : undefined,
+										}}
+									>
+										{model || '(default)'}
+									</button>
+								))}
 							</div>
 						</div>
 					)}

@@ -120,7 +120,7 @@ function getModelContextWindow(model: string): number {
  * Read Codex configuration from ~/.codex/config.toml
  * Returns the model name and context window override if set
  */
-function readCodexConfig(): { model?: string; contextWindow?: number } {
+export function readCodexConfig(): { model?: string; contextWindow?: number } {
 	try {
 		const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 		const configPath = path.join(codexHome, 'config.toml');

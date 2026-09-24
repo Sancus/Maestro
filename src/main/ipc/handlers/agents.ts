@@ -63,6 +63,7 @@ import type { CodexResetCreditConsumeResult } from '../../../shared/codexResetCr
 import type { KnownAuthDirs } from '../../../shared/authPaths';
 import { rememberableEnvVarKeys, type KnownEnvVarKeys } from '../../../shared/envVarCatalog';
 import { mergeCodexModels } from '../../../shared/agentConstants';
+import { readCodexConfig } from '../../parsers/codex-output-parser';
 
 const LOG_CONTEXT = '[AgentDetector]';
 const CONFIG_LOG_CONTEXT = '[AgentConfig]';
@@ -1367,7 +1368,11 @@ export function registerAgentsHandlers(deps: AgentsHandlerDependencies): void {
 			}
 
 			// Merge: stored config takes precedence over defaults
-			return { ...defaults, ...storedConfig };
+			return {
+				...defaults,
+				...storedConfig,
+				...(agentId === 'codex' && { resolvedDefaultModel: readCodexConfig().model }),
+			};
 		})
 	);
 

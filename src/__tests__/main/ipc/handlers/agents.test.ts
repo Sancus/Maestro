@@ -12,6 +12,12 @@ import {
 	AgentsHandlerDependencies,
 } from '../../../../main/ipc/handlers/agents';
 import * as agentCapabilities from '../../../../main/agents';
+import { readCodexConfig } from '../../../../main/parsers/codex-output-parser';
+
+vi.mock('../../../../main/parsers/codex-output-parser', () => ({
+	readCodexConfig: vi.fn(() => ({ model: 'gpt-6-sol' })),
+}));
+
 // Mock electron's ipcMain
 vi.mock('electron', () => ({
 	ipcMain: {
@@ -871,6 +877,13 @@ describe('agents IPC handlers', () => {
 	});
 
 	describe('agents:getConfig', () => {
+		it('reports the configured Codex default model separately from overrides', async () => {
+			mockAgentConfigsStore.get.mockReturnValue({});
+			const handler = handlers.get('agents:getConfig');
+			const result = await handler!({} as any, 'codex');
+			expect(readCodexConfig).toHaveBeenCalled();
+			expect(result).toMatchObject({ resolvedDefaultModel: 'gpt-6-sol' });
+		});
 		it('should return configuration for agent', async () => {
 			const mockConfigs = {
 				'claude-code': { customPath: '/custom/path', model: 'gpt-4' },
