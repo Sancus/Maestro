@@ -62,6 +62,7 @@ import { formatMetaKey } from '../utils/shortcutFormatter';
 import { logger } from '../utils/logger';
 import { notifyCenterFlash } from '../stores/centerFlashStore';
 import { ResizeHandles } from './ui/ResizeHandles';
+import { effortsForModel } from '../../shared/agentConstants';
 
 // Re-export for external consumers
 export { DEFAULT_BATCH_PROMPT, validateAgentPromptHasTaskReference } from '../hooks';
@@ -175,6 +176,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	const [maxAutoResumes, setMaxAutoResumes] = useState(AUTO_RESUME_DEFAULT_MAX_ATTEMPTS);
 	const [availableModels, setAvailableModels] = useState<string[]>([]);
 	const [availableEfforts, setAvailableEfforts] = useState<string[]>([]);
+	const [agentDefaultModel, setAgentDefaultModel] = useState('');
 
 	// Fetch the model and effort options for the agent behind this run. Uses a
 	// stale flag so a slow response (e.g. `opencode models` shelling out) for a
@@ -185,9 +187,18 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 		if (!agentId) {
 			setAvailableModels([]);
 			setAvailableEfforts([]);
+			setAgentDefaultModel('');
 			return;
 		}
 		let stale = false;
+		window.maestro.agents
+			.getConfig(agentId)
+			.then((config) => {
+				if (!stale) setAgentDefaultModel(config?.model || config?.resolvedDefaultModel || '');
+			})
+			.catch(() => {
+				if (!stale) setAgentDefaultModel('');
+			});
 		window.maestro.agents
 			.getModels(agentId)
 			.then((models) => {
@@ -1186,7 +1197,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 										}}
 									>
 										<option value="">Default effort</option>
-										{availableEfforts.map((e) => (
+										{effortsForModel(
+											activeSession?.toolType,
+											runModel || activeSession?.customModel || agentDefaultModel,
+											availableEfforts
+										).map((e) => (
 											<option key={e} value={e}>
 												{e}
 											</option>

@@ -1100,6 +1100,67 @@ describe('applyAgentConfigOverrides', () => {
 		expect(result.customArgsSource).toBe('none');
 	});
 
+	describe('Codex session controls', () => {
+		const codex = makeAgent({ id: 'codex' });
+
+		it('defaults each Codex agent to 272K context with fast mode off', () => {
+			const result = applyAgentConfigOverrides(codex, ['exec'], {});
+
+			expect(result.args).toEqual([
+				'exec',
+				'-c',
+				'model_context_window=272000',
+				'-c',
+				'service_tier="default"',
+				'-c',
+				'features.fast_mode=false',
+			]);
+		});
+
+		it('enables 1M context and fast service tier for the selected agent', () => {
+			const result = applyAgentConfigOverrides(codex, ['exec'], {
+				sessionCustomContextWindow: 1_000_000,
+				sessionCustomFastMode: true,
+			});
+
+			expect(result.args).toEqual([
+				'exec',
+				'-c',
+				'model_context_window=1000000',
+				'-c',
+				'service_tier="fast"',
+				'-c',
+				'features.fast_mode=true',
+			]);
+		});
+
+		it('appends pill overrides after custom args so the session selection wins', () => {
+			const result = applyAgentConfigOverrides(codex, [], {
+				sessionCustomArgs:
+					'-c model_context_window=123 -c service_tier="fast" -c features.fast_mode=true --another-option',
+			});
+
+			expect(result.args.slice(-7)).toEqual([
+				'--another-option',
+				'-c',
+				'model_context_window=272000',
+				'-c',
+				'service_tier="default"',
+				'-c',
+				'features.fast_mode=false',
+			]);
+		});
+
+		it('does not add Codex config overrides to another provider', () => {
+			const result = applyAgentConfigOverrides(makeAgent({ id: 'claude-code' }), ['--print'], {
+				sessionCustomContextWindow: 1_000_000,
+				sessionCustomFastMode: true,
+			});
+
+			expect(result.args).toEqual(['--print']);
+		});
+	});
+
 	// -- parseCustomArgs (tested through applyAgentConfigOverrides) --
 	it('parses quoted custom args correctly', () => {
 		const agent = makeAgent();

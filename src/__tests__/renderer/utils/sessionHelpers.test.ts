@@ -196,6 +196,7 @@ describe('sessionHelpers', () => {
 				sessionCustomEnvVars: customEnvVars,
 				sessionCustomModel: 'custom-model',
 				sessionCustomContextWindow: 128000,
+				sessionCustomFastMode: true,
 			});
 
 			expect(result).not.toBeNull();
@@ -204,6 +205,7 @@ describe('sessionHelpers', () => {
 			expect(result!.sessionCustomEnvVars).toEqual(customEnvVars);
 			expect(result!.sessionCustomModel).toBe('custom-model');
 			expect(result!.sessionCustomContextWindow).toBe(128000);
+			expect(result!.sessionCustomFastMode).toBe(true);
 		});
 
 		it('handles agents with empty args array', async () => {

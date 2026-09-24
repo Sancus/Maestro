@@ -57,6 +57,7 @@ import { useWindowOwnsSession } from '../../contexts/WindowContext';
 import type { PaneFileActions, PaneTabActions } from './TiledLayout';
 import type { Theme, UnifiedTabRef } from '../../types';
 import type { MainPanelHandle, MainPanelProps } from './types';
+import { DEFAULT_CODEX_CONTEXT_WINDOW, effortsForModel } from '../../../shared/agentConstants';
 
 /**
  * Empty placeholder shown when this window has no agent to display - either no
@@ -412,6 +413,7 @@ export const MainPanel = React.memo(
 			defaultEffort: agentDefaultEffort,
 		} = useAgentModelEffortOptions(activeSession?.toolType);
 		const setSessions = useSessionStore((s) => s.setSessions);
+		const updateSession = useSessionStore((s) => s.updateSession);
 
 		// Navigate to agent/tab when clicking an agent pill in the log viewer
 		const handleLogSessionClick = useCallback(
@@ -490,6 +492,10 @@ export const MainPanel = React.memo(
 			activeSession,
 			{ defaultModel: agentDefaultModel, defaultEffort: agentDefaultEffort }
 		);
+		const showCodexControls = activeSession?.toolType === 'codex';
+		const resolvedContextWindow =
+			activeSession?.customContextWindow ?? DEFAULT_CODEX_CONTEXT_WINDOW;
+		const resolvedFastMode = activeSession?.customFastMode ?? false;
 
 		const setTabModel = useTabStore((s) => s.setTabModel);
 		const setTabEffort = useTabStore((s) => s.setTabEffort);
@@ -508,6 +514,22 @@ export const MainPanel = React.memo(
 				setTabEffort(activeTab.id, effort || undefined);
 			},
 			[activeTab, setTabEffort]
+		);
+
+		const handleContextWindowChange = useCallback(
+			(contextWindow: number) => {
+				if (!activeSession || activeSession.toolType !== 'codex') return;
+				updateSession(activeSession.id, { customContextWindow: contextWindow });
+			},
+			[activeSession, updateSession]
+		);
+
+		const handleFastModeChange = useCallback(
+			(enabled: boolean) => {
+				if (!activeSession || activeSession.toolType !== 'codex') return;
+				updateSession(activeSession.id, { customFastMode: enabled });
+			},
+			[activeSession, updateSession]
 		);
 
 		// Opening the snooze picker needs nothing from App.tsx, so it talks to the
@@ -1507,8 +1529,17 @@ export const MainPanel = React.memo(
 									// Model/Effort quick-change pills
 									currentModel={resolvedModel}
 									currentEffort={resolvedEffort}
+									showCodexControls={showCodexControls}
+									currentContextWindow={resolvedContextWindow}
+									fastMode={resolvedFastMode}
+									onContextWindowChange={handleContextWindowChange}
+									onFastModeChange={handleFastModeChange}
 									availableModels={pillModels}
-									availableEfforts={pillEfforts}
+									availableEfforts={effortsForModel(
+										activeSession?.toolType,
+										resolvedModel,
+										pillEfforts
+									)}
 									onModelChange={handleModelChange}
 									onEffortChange={handleEffortChange}
 								/>

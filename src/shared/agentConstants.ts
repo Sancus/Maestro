@@ -8,6 +8,33 @@
 import type { AgentId } from './agentIds';
 import type { AgentCapabilitiesSnapshot } from './agentCapabilities';
 
+/** Context-window sizes offered by the Codex composer pill. */
+export const CODEX_CONTEXT_WINDOWS = [272_000, 1_000_000] as const;
+export const DEFAULT_CODEX_CONTEXT_WINDOW = CODEX_CONTEXT_WINDOWS[0];
+
+/**
+ * Codex models announced for the current staged rollout. Keep these available
+ * even before a particular Codex installation refreshes models_cache.json;
+ * Codex remains responsible for enforcing account-level rollout access.
+ */
+export const CODEX_ROLLOUT_MODELS = ['gpt-6-sol', 'gpt-6-luna'] as const;
+
+/** Merge Maestro's rollout baseline with a Codex-discovered model catalog. */
+export function mergeCodexModels(discovered: readonly string[]): string[] {
+	return Array.from(new Set<string>([...CODEX_ROLLOUT_MODELS, ...discovered]));
+}
+
+/** Narrow an agent-wide effort list to values accepted by the selected model. */
+export function effortsForModel(
+	agentId: string | undefined,
+	model: string,
+	efforts: string[]
+): string[] {
+	return agentId === 'codex' && model === 'gpt-6-luna'
+		? efforts.filter((effort) => effort !== 'ultra')
+		: efforts;
+}
+
 /**
  * Default context window sizes for different agents.
  * Used as fallback when the agent doesn't report its context window size.
@@ -16,7 +43,7 @@ import type { AgentCapabilitiesSnapshot } from './agentCapabilities';
  */
 export const DEFAULT_CONTEXT_WINDOWS: Partial<Record<AgentId, number>> = {
 	'claude-code': 200000, // Claude 3.5 Sonnet/Claude 4 default context
-	codex: 200000, // OpenAI o3/o4-mini context window
+	codex: DEFAULT_CODEX_CONTEXT_WINDOW,
 	opencode: 128000, // OpenCode (depends on model, 128k is conservative default)
 	'factory-droid': 200000, // Factory Droid (varies by model, defaults to Claude Opus)
 	hermes: 200000, // Conservative fallback until runtime-specific reporting lands

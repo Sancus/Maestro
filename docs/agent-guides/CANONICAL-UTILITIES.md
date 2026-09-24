@@ -1,5 +1,7 @@
 # Canonical Utilities - Full Rationale
 
+- **Codex rollout model catalog:** `CODEX_ROLLOUT_MODELS` and `mergeCodexModels()` in `src/shared/agentConstants.ts` are the canonical baseline for models that OpenAI has announced but a staged rollout may not yet have written to `models_cache.json`. Both local and SSH discovery merge through this helper so packaged and remote agents expose the same model choices without duplicating release IDs. Keep cache-discovered models too, and leave account entitlement enforcement to Codex when the user starts a turn.
+
 The complete, reasoned entry for every commonly-reimplemented function in the codebase. The always-loaded index in [CLAUDE.md](../../CLAUDE.md#commonly-reimplemented-functions-do-not-add-new-copies) lists each entry as one line (name, canonical symbols, path); this file carries the why - the failure each canonical implementation replaced, the invariants it protects, and the traps that made the duplicates subtly wrong. Read the matching entry here BEFORE extending or working around one of these utilities.
 
 Grep-verified 2026-09-04 (`npm run docs:verify` checks that every path below still resolves).

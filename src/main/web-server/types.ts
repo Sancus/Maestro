@@ -1163,6 +1163,7 @@ export interface CreateSessionConfig {
 	 * write is a materialization of the default rather than a choice.
 	 */
 	contextWindowSource?: 'user-edited';
+	customFastMode?: boolean;
 	customProviderPath?: string;
 	sessionSshRemoteConfig?: {
 		enabled: boolean;

@@ -212,23 +212,22 @@ describe('QueuedItemEditModal model + effort override', () => {
 		);
 	});
 
-	it('clears an override back to the agent default', async () => {
+	it('offers named models without a separate default choice', async () => {
 		const { onSave } = renderWithSession('claude-code', {
 			turnSettings: { model: 'sonnet', effort: 'think' },
 		});
 		await waitFor(() => expect(screen.getByTitle('Change model')).toBeInTheDocument());
 
 		fireEvent.click(screen.getByTitle('Change model'));
-		fireEvent.click(screen.getByText('(default)'));
+		expect(screen.queryByText('(default)')).not.toBeInTheDocument();
+		fireEvent.click(screen.getByText('opus'));
 
 		fireEvent.keyDown(screen.getByPlaceholderText('Message to send…'), {
 			key: 'Enter',
 			metaKey: true,
 		});
-		// `model` must be absent, not left at 'sonnet' - the whole point of the
-		// patch carrying a full turnSettings object.
 		expect(onSave).toHaveBeenCalledWith(
-			expect.objectContaining({ turnSettings: { model: undefined, effort: 'think' } })
+			expect.objectContaining({ turnSettings: { model: 'opus', effort: 'think' } })
 		);
 	});
 

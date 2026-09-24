@@ -287,6 +287,8 @@ export interface SessionInfo {
 	customPath?: string;
 	/** Per-session context window size in tokens. */
 	customContextWindow?: number;
+	/** Per-session Codex fast-mode preference. */
+	customFastMode?: boolean;
 	/** Claude token-source opt-in: drives the maestro-p TUI (Max quota) when on. */
 	enableMaestroP?: boolean;
 	/** Refines {@link enableMaestroP}: 'interactive' = always TUI, 'dynamic' = TUI then API fallback. */

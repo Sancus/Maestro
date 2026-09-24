@@ -133,6 +133,7 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		// while still being outranked in the parent - the same agent's gauge,
 		// timeline and compaction threshold disagreeing across a worktree split.
 		contextWindowSource: isLegacy ? undefined : params.parentSession.contextWindowSource,
+		customFastMode: isLegacy ? undefined : params.parentSession.customFastMode,
 		nudgeMessage: isLegacy ? undefined : params.parentSession.nudgeMessage,
 		newSessionMessage: isLegacy ? undefined : params.parentSession.newSessionMessage,
 		autoRunFolderPath: isLegacy ? undefined : params.parentSession.autoRunFolderPath,

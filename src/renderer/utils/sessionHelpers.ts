@@ -84,6 +84,8 @@ export interface BuildSpawnConfigOptions {
 	 * (e.g. `--add-dir`); every agent also gets them via the system prompt.
 	 */
 	sessionAdditionalDirectories?: AdditionalDirectory[];
+	/** Per-session Codex fast mode */
+	sessionCustomFastMode?: boolean;
 	/** Per-session SSH remote config (takes precedence over agent-level SSH config) */
 	sessionSshRemoteConfig?: {
 		enabled: boolean;
@@ -135,6 +137,7 @@ export async function buildSpawnConfigForAgent(
 		sessionCustomEffort,
 		sessionCustomContextWindow,
 		sessionAdditionalDirectories,
+		sessionCustomFastMode,
 		sessionSshRemoteConfig,
 		appendSystemPrompt,
 	} = options;
@@ -183,6 +186,7 @@ export async function buildSpawnConfigForAgent(
 		sessionCustomEffort,
 		sessionCustomContextWindow,
 		sessionAdditionalDirectories,
+		sessionCustomFastMode,
 		// Per-session SSH remote config (takes precedence over agent-level SSH config)
 		sessionSshRemoteConfig,
 	};

@@ -121,4 +121,9 @@ export interface InputAreaProps {
 	availableEfforts?: string[];
 	onModelChange?: (model: string) => void;
 	onEffortChange?: (effort: string) => void;
+	showCodexControls?: boolean;
+	currentContextWindow?: number;
+	onContextWindowChange?: (contextWindow: number) => void;
+	fastMode?: boolean;
+	onFastModeChange?: (enabled: boolean) => void;
 }

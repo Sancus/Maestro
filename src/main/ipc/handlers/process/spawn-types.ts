@@ -30,6 +30,7 @@ export interface SpawnProcessConfig {
 	sessionCustomModel?: string; // Session-specific model selection
 	sessionCustomEffort?: string; // Session-specific effort/reasoning level
 	sessionCustomContextWindow?: number; // Session-specific context window size
+	sessionCustomFastMode?: boolean; // Session-specific Codex fast mode
 	// Session's Additional Directories. Providers that declare
 	// `supportsAdditionalDirectories` turn these into native grant flags
 	// (e.g. --add-dir); every agent also gets them via the system prompt.

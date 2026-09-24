@@ -61,6 +61,7 @@ export interface UseAgentListenersDeps {
 					customEnvVars?: Record<string, string>;
 					customModel?: string;
 					customContextWindow?: number;
+					customFastMode?: boolean;
 					sessionSshRemoteConfig?: {
 						enabled: boolean;
 						remoteId: string | null;

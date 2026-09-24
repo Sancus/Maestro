@@ -19,6 +19,19 @@ export interface ProcessConfig {
 	readOnlyMode?: boolean; // For read-only/plan mode (uses agent's readOnlyArgs)
 	modelId?: string; // For model selection (uses agent's modelArgs builder)
 	yoloMode?: boolean; // For YOLO/full-access mode (uses agent's yoloModeArgs)
+	// Per-session overrides (take precedence over agent-level config)
+	sessionCustomPath?: string;
+	sessionCustomArgs?: string;
+	sessionCustomEnvVars?: Record<string, string>;
+	sessionCustomModel?: string;
+	sessionCustomEffort?: string;
+	sessionCustomContextWindow?: number;
+	sessionCustomFastMode?: boolean;
+	sessionSshRemoteConfig?: {
+		enabled: boolean;
+		remoteId: string | null;
+		workingDirOverride?: string;
+	};
 	permissionMode?: 'full' | 'standard' | 'readonly'; // 3-way permission mode (overrides readOnlyMode/yoloMode)
 	// System prompt delivery (separate from user message for token efficiency)
 	appendSystemPrompt?: string; // System prompt to pass via --append-system-prompt or embed in prompt

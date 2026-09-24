@@ -38,6 +38,7 @@ import {
 	primeOmpModelCatalog,
 	buildOmpPrimeEnv,
 } from './omp-model-catalog';
+import { mergeCodexModels } from '../../shared/agentConstants';
 
 const LOG_CONTEXT = 'AgentDetector';
 
@@ -453,7 +454,7 @@ export class AgentDetector {
 							models?: Array<{ slug?: string; visibility?: string }>;
 						}>(cacheContent);
 						if (Array.isArray(cache.models)) {
-							const models = cache.models
+							const discoveredModels = cache.models
 								.filter(
 									(m: {
 										slug?: string;
@@ -462,6 +463,7 @@ export class AgentDetector {
 										typeof m.slug === 'string' && m.visibility !== 'hide'
 								)
 								.map((m) => m.slug);
+							const models = mergeCodexModels(discoveredModels);
 							logger.info(
 								`Discovered ${models.length} models for ${agentId} from models_cache.json`,
 								LOG_CONTEXT,
@@ -472,7 +474,7 @@ export class AgentDetector {
 					} catch {
 						logger.debug('Could not read Codex models_cache.json for model discovery', LOG_CONTEXT);
 					}
-					return [];
+					return mergeCodexModels([]);
 				}
 
 				case 'opencode': {
@@ -805,8 +807,8 @@ export class AgentDetector {
 									}
 								}
 								const levels = Array.from(levelSet);
-								// Sort by severity: minimal < low < medium < high < xhigh
-								const order = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+								// Sort by severity: minimal < low < medium < high < xhigh < max < ultra
+								const order = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
 								levels.sort(
 									(a, b) =>
 										(order.indexOf(a) === -1 ? 99 : order.indexOf(a)) -

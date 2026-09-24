@@ -67,6 +67,11 @@ interface ToolbarControlsProps {
 	availableEfforts: string[];
 	onModelChange?: (model: string) => void;
 	onEffortChange?: (effort: string) => void;
+	showCodexControls: boolean;
+	currentContextWindow?: number;
+	onContextWindowChange?: (contextWindow: number) => void;
+	fastMode: boolean;
+	onFastModeChange?: (enabled: boolean) => void;
 	modelMenuOpen: boolean;
 	setModelMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
 	modelMenuRef: React.RefObject<HTMLDivElement>;
@@ -79,6 +84,9 @@ interface ToolbarControlsProps {
 	 * the column beside the composer.
 	 */
 	processInput?: () => void;
+	contextMenuOpen: boolean;
+	setContextMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+	contextMenuRef: React.RefObject<HTMLDivElement>;
 }
 
 export const ToolbarControls = memo(function ToolbarControls({
@@ -108,6 +116,11 @@ export const ToolbarControls = memo(function ToolbarControls({
 	availableEfforts,
 	onModelChange,
 	onEffortChange,
+	showCodexControls,
+	currentContextWindow,
+	onContextWindowChange,
+	fastMode,
+	onFastModeChange,
 	modelMenuOpen,
 	setModelMenuOpen,
 	modelMenuRef,
@@ -115,6 +128,9 @@ export const ToolbarControls = memo(function ToolbarControls({
 	setEffortMenuOpen,
 	effortMenuRef,
 	processInput,
+	contextMenuOpen,
+	setContextMenuOpen,
+	contextMenuRef,
 }: ToolbarControlsProps) {
 	const isAiMode = session.inputMode === 'ai';
 	const { isNarrow: isNarrowViewport } = useViewportBreakpoint();
@@ -412,12 +428,20 @@ export const ToolbarControls = memo(function ToolbarControls({
 					availableEfforts={availableEfforts}
 					onModelChange={onModelChange}
 					onEffortChange={onEffortChange}
+					showCodexControls={showCodexControls}
+					currentContextWindow={currentContextWindow}
+					onContextWindowChange={onContextWindowChange}
+					fastMode={fastMode}
+					onFastModeChange={onFastModeChange}
 					modelMenuOpen={modelMenuOpen}
 					setModelMenuOpen={setModelMenuOpen}
 					modelMenuRef={modelMenuRef}
 					effortMenuOpen={effortMenuOpen}
 					setEffortMenuOpen={setEffortMenuOpen}
 					effortMenuRef={effortMenuRef}
+					contextMenuOpen={contextMenuOpen}
+					setContextMenuOpen={setContextMenuOpen}
+					contextMenuRef={contextMenuRef}
 				/>
 			</div>
 

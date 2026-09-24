@@ -184,6 +184,8 @@ export async function handleProcessSpawn(
 		agentConfigValues,
 		sessionCustomModel: config.sessionCustomModel,
 		sessionCustomEffort: config.sessionCustomEffort,
+		sessionCustomContextWindow: config.sessionCustomContextWindow,
+		sessionCustomFastMode: config.sessionCustomFastMode,
 		sessionCustomArgs: config.sessionCustomArgs,
 		sessionCustomEnvVars: config.sessionCustomEnvVars,
 	});

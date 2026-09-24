@@ -17,6 +17,7 @@ import { LightboxModal } from './LightboxModal';
 import { ModelEffortPills } from './InputArea/components/ModelEffortPills';
 import { useModelEffortMenus } from './InputArea/hooks/useModelEffortMenus';
 import { useAgentModelEffortOptions } from '../hooks/agent/useAgentModelEffortOptions';
+import { effortsForModel } from '../../shared/agentConstants';
 import { codifyTurnSettings } from '../utils/providerTabSessions';
 
 interface QueuedItemEditModalProps {
@@ -298,7 +299,11 @@ export function QueuedItemEditModal({
 								currentModel={turnSettings.model ?? providerOptions.defaultModel}
 								currentEffort={turnSettings.effort ?? providerOptions.defaultEffort}
 								availableModels={providerOptions.models}
-								availableEfforts={providerOptions.efforts}
+								availableEfforts={effortsForModel(
+									session?.toolType,
+									turnSettings.model ?? providerOptions.defaultModel,
+									providerOptions.efforts
+								)}
 								onModelChange={(model) =>
 									setTurnSettings((prev) => ({ ...prev, model: model || undefined }))
 								}

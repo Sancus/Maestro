@@ -10,6 +10,9 @@ function Harness() {
 		effortMenuOpen,
 		setEffortMenuOpen,
 		effortMenuRef,
+		contextMenuOpen,
+		setContextMenuOpen,
+		contextMenuRef,
 	} = useModelEffortMenus();
 
 	return (
@@ -22,6 +25,10 @@ function Harness() {
 				<button onClick={() => setEffortMenuOpen(true)}>Open effort</button>
 				<span>{effortMenuOpen ? 'effort-open' : 'effort-closed'}</span>
 			</div>
+			<div ref={contextMenuRef} data-testid="context-menu">
+				<button onClick={() => setContextMenuOpen(true)}>Open context</button>
+				<span>{contextMenuOpen ? 'context-open' : 'context-closed'}</span>
+			</div>
 			<button>Outside</button>
 		</div>
 	);
@@ -33,13 +40,16 @@ describe('useModelEffortMenus', () => {
 
 		fireEvent.click(screen.getByText('Open model'));
 		fireEvent.click(screen.getByText('Open effort'));
+		fireEvent.click(screen.getByText('Open context'));
 		expect(screen.getByText('model-open')).toBeInTheDocument();
 		expect(screen.getByText('effort-open')).toBeInTheDocument();
+		expect(screen.getByText('context-open')).toBeInTheDocument();
 
 		fireEvent.mouseDown(screen.getByText('Outside'));
 
 		expect(screen.getByText('model-closed')).toBeInTheDocument();
 		expect(screen.getByText('effort-closed')).toBeInTheDocument();
+		expect(screen.getByText('context-closed')).toBeInTheDocument();
 	});
 
 	it('keeps menu open for inside mousedown', () => {
