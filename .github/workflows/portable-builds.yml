@@ -137,3 +137,58 @@ jobs:
           path: release/*Portable*.exe
           if-no-files-found: error
           retention-days: 7
+
+  release:
+    name: Publish portable prerelease
+    if: github.repository == 'Sancus/Maestro' && github.ref == 'refs/heads/sancus-fixes'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set release version
+        id: version
+        run: |
+          BASE_VERSION=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          VERSION="${BASE_VERSION}-sancus.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=sancus-$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download portable builds
+        uses: actions/download-artifact@v7
+        with:
+          pattern: maestro-portable-*
+          merge-multiple: true
+          path: release
+
+      - name: Verify release files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for asset in \
+            "release/maestro-${VERSION}-x64-mac.zip" \
+            "release/maestro-${VERSION}-arm64-mac.zip" \
+            "release/maestro-${VERSION}-x64.AppImage" \
+            "release/maestro-${VERSION}-arm64.AppImage" \
+            "release/Maestro-Portable-${VERSION}-x64.exe"; do
+            test -s "$asset" || { echo "Missing release file: $asset" >&2; exit 1; }
+          done
+
+      - name: Publish GitHub prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Maestro ${{ steps.version.outputs.version }} (portable)
+          body: |
+            Portable Sancus build from the sancus-fixes branch.
+
+            macOS ZIPs are unsigned and may require approval in macOS Privacy & Security.
+          prerelease: true
+          files: release/*
+          fail_on_unmatched_files: true
