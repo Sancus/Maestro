@@ -381,7 +381,11 @@ export class ChildProcessSpawner {
 				exitCode: childProcess.exitCode,
 			});
 
-			const isBatchMode = !!prompt;
+			// SSH wrapping moves the prompt out of `prompt`: short prompts are embedded
+			// in the remote command args, while long prompts live in sshStdinScript.
+			// Preserve batch semantics so stdin is closed and the final response is
+			// collected instead of leaving the remote agent waiting indefinitely for EOF.
+			const isBatchMode = !!prompt || !!config.promptAlreadyInArgs || !!config.sshStdinScript;
 			// Detect JSON streaming mode from args or config flag
 			// IMPORTANT: SSH stdin script mode (sshStdinScript) MUST enable stream-json parsing
 			// because the SSH command wraps the actual agent command. Without this, the output

@@ -341,6 +341,42 @@ describe('ChildProcessSpawner', () => {
 			const proc = processes.get('test-session');
 			expect(proc?.isBatchMode).toBe(false);
 		});
+
+		it('should preserve batch mode when an SSH wrapper embedded the prompt in args', () => {
+			const { processes, spawner } = createTestContext();
+
+			spawner.spawn(
+				createBaseConfig({
+					command: 'ssh',
+					args: ['user@host', 'codex exec --json -- "test prompt"'],
+					prompt: undefined,
+					promptAlreadyInArgs: true,
+				})
+			);
+
+			const proc = processes.get('test-session');
+			expect(proc?.isBatchMode).toBe(true);
+			expect(mockChildProcess.stdin.write).not.toHaveBeenCalled();
+			expect(mockChildProcess.stdin.end).toHaveBeenCalledTimes(1);
+		});
+
+		it('should preserve batch mode when an SSH stdin script carries the prompt', () => {
+			const { processes, spawner } = createTestContext();
+
+			spawner.spawn(
+				createBaseConfig({
+					command: 'ssh',
+					args: ['user@host', '/bin/bash'],
+					prompt: undefined,
+					sshStdinScript: 'exec codex exec --json -\nlarge prompt',
+				})
+			);
+
+			const proc = processes.get('test-session');
+			expect(proc?.isBatchMode).toBe(true);
+			expect(mockChildProcess.stdin.write).toHaveBeenCalledTimes(1);
+			expect(mockChildProcess.stdin.end).toHaveBeenCalledTimes(1);
+		});
 	});
 
 	describe('SSH remote context', () => {

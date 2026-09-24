@@ -119,6 +119,7 @@ export async function spawnGroupChatAgent(
 	let spawnEnvVars = customEnvVars;
 	let spawnSshStdinScript: string | undefined;
 	let spawnSshRemoteCommand: string | undefined;
+	let spawnPromptAlreadyInArgs = false;
 
 	// Over SSH, warm the remote maestro-p probe BEFORE resolving so a remote TUI
 	// selection falls back to API instead of exiting 127 when maestro-p isn't
@@ -224,6 +225,7 @@ export async function spawnGroupChatAgent(
 		spawnEnvVars = sshWrapped.customEnvVars;
 		spawnSshStdinScript = sshWrapped.sshStdinScript;
 		spawnSshRemoteCommand = sshWrapped.sshRemoteCommand;
+		spawnPromptAlreadyInArgs = !!sshWrapped.promptAlreadyInArgs;
 		if (sshWrapped.sshRemoteUsed && debugLabel) {
 			console.log(
 				`[GroupChat:Debug] SSH remote used for ${debugLabel}: ${sshWrapped.sshRemoteUsed.name}`
@@ -260,6 +262,7 @@ export async function spawnGroupChatAgent(
 		sendPromptViaStdinRaw: winConfig.sendPromptViaStdinRaw,
 		sshStdinScript: spawnSshStdinScript,
 		sshRemoteCommand: spawnSshRemoteCommand,
+		promptAlreadyInArgs: spawnPromptAlreadyInArgs,
 	});
 
 	return spawnResult;
