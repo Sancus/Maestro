@@ -1508,6 +1508,7 @@ export interface Session {
 	 * value-comparison heuristic gets exactly the codex case wrong.
 	 */
 	contextWindowSource?: 'user-edited';
+	customFastMode?: boolean; // Codex fast mode for this agent
 	documentGraphLayout?: MindMapLayoutType; // Document Graph layout algorithm preference (overrides global default)
 	// Per-session SSH remote configuration (overrides agent-level SSH config)
 	// When set, this session uses the specified SSH remote; when not set, runs locally
@@ -1600,6 +1601,7 @@ export interface ProcessConfig {
 	// `supportsAdditionalDirectories` turn these into native grant flags
 	// (e.g. --add-dir); every agent also gets them via the system prompt.
 	sessionAdditionalDirectories?: AdditionalDirectory[];
+	sessionCustomFastMode?: boolean;
 	// Per-session SSH remote config (takes precedence over agent-level SSH config)
 	sessionSshRemoteConfig?: {
 		enabled: boolean;

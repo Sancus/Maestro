@@ -285,7 +285,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		yoloModeArgs: ['--dangerously-bypass-approvals-and-sandbox'], // Full access mode
 		workingDirArgs: (dir: string) => ['-C', dir], // Set working directory
 		imageArgs: (imagePath: string) => ['-i', imagePath], // Image attachment: codex exec -i /path/to/image.png
-		modelArgs: (modelId: string) => ['-m', modelId], // Model selection: codex exec -m gpt-5.3-codex
+		modelArgs: (modelId: string) => ['-m', modelId], // Model selection: codex exec -m gpt-6-sol
 		// Agent-specific configuration options shown in UI
 		configOptions: [
 			{
@@ -293,7 +293,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 				type: 'text',
 				label: 'Model',
 				description:
-					'Model override (e.g., gpt-5.3-codex, o3). Leave empty to use the default from ~/.codex/config.toml.',
+					'Model override (e.g., gpt-6-sol, gpt-6-luna). Leave empty to use the default from ~/.codex/config.toml.',
 				default: '', // Empty = use Codex's default model from config.toml
 				argBuilder: (value: string) => {
 					if (value && value.trim()) {
@@ -310,7 +310,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 				dynamic: true,
 				// Static fallback used when ~/.codex/models_cache.json hasn't been
 				// written yet (e.g. fresh install) so the dropdown still renders.
-				options: ['', 'minimal', 'low', 'medium', 'high', 'xhigh'],
+				options: ['', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
 				default: '',
 				argBuilder: (value: string) =>
 					value && value.trim() ? ['-c', `reasoning.effort="${value.trim()}"`] : [],

@@ -62,6 +62,7 @@ import {
 import type { CodexResetCreditConsumeResult } from '../../../shared/codexResetCredits';
 import type { KnownAuthDirs } from '../../../shared/authPaths';
 import { rememberableEnvVarKeys, type KnownEnvVarKeys } from '../../../shared/envVarCatalog';
+import { mergeCodexModels } from '../../../shared/agentConstants';
 
 const LOG_CONTEXT = '[AgentDetector]';
 const CONFIG_LOG_CONTEXT = '[AgentConfig]';
@@ -748,8 +749,9 @@ async function discoverModelsFromRemoteConfigs(sshRemote: SshRemoteConfig): Prom
 
 /**
  * Discover available models for an agent on a remote SSH host.
- * Uses the agent's `models` subcommand over SSH, supplemented by models
- * from remote opencode.json config files for OpenCode agents.
+ * Uses the agent's `models` subcommand over SSH, except Codex, whose model
+ * catalog is read from its remote models_cache.json. OpenCode is supplemented
+ * by models from remote opencode.json config files.
  * Returns an empty array on timeout, non-zero exit, or unknown agent.
  * Throws on unexpected errors (e.g., SSH config issues, parsing bugs).
  */
@@ -776,11 +778,18 @@ async function discoverModelsRemote(
 		return [];
 	}
 
-	const remoteOptions: RemoteCommandOptions = {
-		command: agentDef.binaryName,
-		args: agentId === 'omp' ? ['models', '--json'] : ['models'],
-		env: sshRemote.remoteEnv,
-	};
+	const remoteOptions: RemoteCommandOptions =
+		agentId === 'codex'
+			? {
+					command: 'sh',
+					args: ['-c', 'cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null || true'],
+					env: sshRemote.remoteEnv,
+				}
+			: {
+					command: agentDef.binaryName,
+					args: agentId === 'omp' ? ['models', '--json'] : ['models'],
+					env: sshRemote.remoteEnv,
+				};
 
 	try {
 		const sshCommand = await buildSshCommand(sshRemote, remoteOptions);
@@ -818,7 +827,26 @@ async function discoverModelsRemote(
 		const models: string[] = [];
 		const sanitizedStdout = stripAnsi(result.stdout);
 
-		if (agentId === 'omp') {
+		if (agentId === 'codex') {
+			try {
+				const cache = parseJsonWithBom<{
+					models?: Array<{ slug?: string; visibility?: string }>;
+				}>(sanitizedStdout);
+				const cacheModels = Array.isArray(cache.models)
+					? cache.models
+							.filter(
+								(model): model is { slug: string; visibility?: string } =>
+									typeof model.slug === 'string' && model.visibility !== 'hide'
+							)
+							.map((model) => model.slug)
+					: [];
+				models.push(...mergeCodexModels(cacheModels));
+			} catch {
+				// A fresh remote Codex install may not have written its cache yet.
+				models.push(...mergeCodexModels([]));
+			}
+			for (const model of models) seen.add(model);
+		} else if (agentId === 'omp') {
 			// `omp models` prints a human table; the machine-readable form is
 			// `omp models --json` -> { models: [{ selector, id, ... }] }. Use the
 			// provider-qualified selector, mirroring the local discovery path so the

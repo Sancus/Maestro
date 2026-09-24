@@ -1511,6 +1511,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							sessionCustomModel: freshActiveTab?.customModel ?? freshSession.customModel,
 							sessionCustomEffort: freshActiveTab?.customEffort ?? freshSession.customEffort,
 							sessionCustomContextWindow: freshSession.customContextWindow,
+							sessionCustomFastMode: freshSession.customFastMode,
 							// Per-session SSH remote config (takes precedence over agent-level SSH config)
 							sessionSshRemoteConfig: freshSession.sessionSshRemoteConfig,
 						});

@@ -8,6 +8,9 @@ import {
 	FALLBACK_CONTEXT_WINDOW,
 	COMBINED_CONTEXT_AGENTS,
 	resilienceEnabled,
+	CODEX_ROLLOUT_MODELS,
+	mergeCodexModels,
+	effortsForModel,
 } from '../../shared/agentConstants';
 import { AGENT_IDS } from '../../shared/agentIds';
 
@@ -25,7 +28,7 @@ describe('agentConstants', () => {
 	describe('DEFAULT_CONTEXT_WINDOWS', () => {
 		it('should have entries for active agents', () => {
 			expect(DEFAULT_CONTEXT_WINDOWS['claude-code']).toBe(200000);
-			expect(DEFAULT_CONTEXT_WINDOWS['codex']).toBe(200000);
+			expect(DEFAULT_CONTEXT_WINDOWS['codex']).toBe(272000);
 			expect(DEFAULT_CONTEXT_WINDOWS['opencode']).toBe(128000);
 			expect(DEFAULT_CONTEXT_WINDOWS['factory-droid']).toBe(200000);
 			expect(DEFAULT_CONTEXT_WINDOWS['hermes']).toBe(200000);
@@ -49,6 +52,26 @@ describe('agentConstants', () => {
 				}
 			}
 		});
+	});
+
+	describe('Codex model availability', () => {
+		it('publishes the current rollout model IDs', () => {
+			expect(CODEX_ROLLOUT_MODELS).toEqual(['gpt-6-sol', 'gpt-6-luna']);
+		});
+
+		it('places rollout models before discovered models without duplicates', () => {
+			expect(mergeCodexModels(['gpt-5.6-sol', 'gpt-6-sol'])).toEqual([
+				'gpt-6-sol',
+				'gpt-6-luna',
+				'gpt-5.6-sol',
+			]);
+		});
+	});
+
+	it('excludes Ultra only for Luna', () => {
+		const efforts = ['', 'medium', 'max', 'ultra'];
+		expect(effortsForModel('codex', 'gpt-6-luna', efforts)).toEqual(['', 'medium', 'max']);
+		expect(effortsForModel('codex', 'gpt-6-sol', efforts)).toEqual(efforts);
 	});
 
 	describe('COMBINED_CONTEXT_AGENTS', () => {

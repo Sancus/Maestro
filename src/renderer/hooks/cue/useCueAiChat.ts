@@ -124,6 +124,7 @@ export function useCueAiChat({
 				sessionCustomEnvVars: session.customEnvVars,
 				sessionCustomModel: session.customModel,
 				sessionCustomContextWindow: session.customContextWindow,
+				sessionCustomFastMode: session.customFastMode,
 				sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 			});
 

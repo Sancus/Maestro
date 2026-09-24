@@ -256,6 +256,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 						customModel: undefined,
 						customEffort: undefined,
 						customContextWindow: undefined,
+						customFastMode: undefined,
 						// Provenance describes the value cleared above, so it must not
 						// outlive it: a stale 'user-edited' would make the new
 						// provider's window look deliberate (finding AD1).

@@ -12,7 +12,6 @@ import {
 	AgentsHandlerDependencies,
 } from '../../../../main/ipc/handlers/agents';
 import * as agentCapabilities from '../../../../main/agents';
-
 // Mock electron's ipcMain
 vi.mock('electron', () => ({
 	ipcMain: {
@@ -1439,6 +1438,46 @@ describe('agents IPC handlers', () => {
 					expect.objectContaining({ command: 'omp', args: ['models', '--json'] })
 				);
 				expect(result).toEqual(['anthropic/claude-opus-4-8', 'openai-codex/gpt-5.2']);
+			});
+
+			it('should merge Codex rollout models with the remote models cache', async () => {
+				mockSettingsStore.get.mockReturnValue([
+					{
+						id: 'remote-codex',
+						host: 'codex.example.com',
+						user: 'dev',
+						enabled: true,
+					},
+				]);
+
+				vi.mocked(buildSshCommand).mockResolvedValue({
+					command: 'ssh',
+					args: ['dev@codex.example.com', 'read codex cache'],
+				});
+				vi.mocked(execFileNoThrow).mockResolvedValue({
+					exitCode: 0,
+					stdout: JSON.stringify({
+						models: [
+							{ slug: 'gpt-5.6-sol', visibility: 'list' },
+							{ slug: 'hidden-model', visibility: 'hide' },
+						],
+					}),
+					stderr: '',
+				});
+
+				const handler = handlers.get('agents:getModels');
+				const result = await handler!({} as any, 'codex', true, 'remote-codex');
+
+				expect(buildSshCommand).toHaveBeenCalledWith(
+					expect.objectContaining({ id: 'remote-codex', host: 'codex.example.com' }),
+					expect.objectContaining({
+						command: 'sh',
+						args: ['-c', 'cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null || true'],
+					})
+				);
+				expect(result).toEqual(['gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol']);
+				expect(result).not.toContain('hidden-model');
+				expect(mockAgentDetector.discoverModels).not.toHaveBeenCalled();
 			});
 
 			it('should throw when SSH remote not found', async () => {

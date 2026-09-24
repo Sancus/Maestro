@@ -216,6 +216,7 @@ You are continuing this conversation from the fork point above. Briefly acknowle
 					sessionCustomModel: session.customModel,
 					sessionCustomEffort: session.customEffort,
 					sessionCustomContextWindow: session.customContextWindow,
+					sessionCustomFastMode: session.customFastMode,
 					sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 				});
 			} catch (error) {

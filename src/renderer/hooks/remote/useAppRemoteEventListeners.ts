@@ -1548,6 +1548,9 @@ export function useAppRemoteEventListeners(deps: UseAppRemoteEventListenersDeps)
 				...(config?.contextWindowSource === 'user-edited' && {
 					contextWindowSource: 'user-edited' as const,
 				}),
+				...(typeof config?.customFastMode === 'boolean' && {
+					customFastMode: config.customFastMode,
+				}),
 				...(config?.customProviderPath && {
 					customProviderPath: config.customProviderPath as string,
 				}),
@@ -1785,6 +1788,7 @@ export function useAppRemoteEventListeners(deps: UseAppRemoteEventListenersDeps)
 				// Provenance describes the value cleared above and must not outlive
 				// it (finding AD1); mirrors the Edit Agent modal's switch branch.
 				contextWindowSource: undefined,
+				customFastMode: undefined,
 				enableMaestroP: undefined,
 				maestroPPath: undefined,
 				maestroPMode: undefined,
@@ -1927,6 +1931,7 @@ export function useAppRemoteEventListeners(deps: UseAppRemoteEventListenersDeps)
 			// its provenance, and the value it just set stays outranked by the
 			// provider's report - the deliberate edit would silently not apply.
 			'contextWindowSource',
+			'customFastMode',
 			'enableMaestroP',
 			'maestroPMode',
 			'maestroPPath',

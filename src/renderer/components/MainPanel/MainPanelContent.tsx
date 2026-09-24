@@ -306,6 +306,11 @@ export interface MainPanelContentProps {
 	availableEfforts?: string[];
 	onModelChange?: (model: string) => void;
 	onEffortChange?: (effort: string) => void;
+	showCodexControls?: boolean;
+	currentContextWindow?: number;
+	onContextWindowChange?: (contextWindow: number) => void;
+	fastMode?: boolean;
+	onFastModeChange?: (enabled: boolean) => void;
 }
 
 export const MainPanelContent = React.memo(function MainPanelContent(props: MainPanelContentProps) {
@@ -469,6 +474,11 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 		availableEfforts,
 		onModelChange,
 		onEffortChange,
+		showCodexControls,
+		currentContextWindow,
+		onContextWindowChange,
+		fastMode,
+		onFastModeChange,
 	} = props;
 
 	// Chat and terminal each carry their own font and size; an unset value means
@@ -1155,6 +1165,11 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 						// Model/Effort quick-change pills
 						currentModel={currentModel}
 						currentEffort={currentEffort}
+						showCodexControls={showCodexControls}
+						currentContextWindow={currentContextWindow}
+						fastMode={fastMode}
+						onContextWindowChange={onContextWindowChange}
+						onFastModeChange={onFastModeChange}
 						availableModels={availableModels}
 						availableEfforts={availableEfforts}
 						onModelChange={onModelChange}

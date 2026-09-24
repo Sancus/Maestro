@@ -27,11 +27,11 @@ import { restorePointer, setCoarsePointer } from '../../helpers/mockPointer';
 const MODELS = ['claude-sonnet-4.5', 'gpt-5', 'gemini-2.5-pro'];
 const EFFORTS = ['', 'low', 'medium', 'high'];
 
-function seedStore(tabOverrides: Record<string, unknown> = {}) {
+function seedStore(tabOverrides: Record<string, unknown> = {}, toolType = 'claude-code') {
 	const tab = createMockAITab({ id: 'tab-1', name: 'Refactor', ...tabOverrides });
 	const session = createMockSession({
 		id: 'session-1',
-		toolType: 'claude-code',
+		toolType: toolType as never,
 		aiTabs: [tab],
 		activeTabId: 'tab-1',
 	});
@@ -174,6 +174,24 @@ describe('ModelEffortModal', () => {
 		fireEvent.keyDown(keyTarget(), { key: 'ArrowUp' });
 
 		expect(screen.getByText('Agent default - claude-sonnet-4.5')).toBeInTheDocument();
+	});
+
+	it('excludes Ultra for Luna and restores it for Sol', async () => {
+		seedStore({ customModel: 'gpt-6-luna' }, 'codex');
+		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+			'gpt-6-luna',
+			'gpt-6-sol',
+		]);
+		(window.maestro.agents.getConfigOptions as ReturnType<typeof vi.fn>).mockImplementation(
+			async (_agentId: string, key: string) =>
+				key === 'reasoningEffort' ? ['', 'medium', 'max', 'ultra'] : []
+		);
+		renderModal();
+		await screen.findByText('gpt-6-luna');
+		expect(screen.getByText('max')).toBeInTheDocument();
+		expect(screen.queryByText('ultra')).not.toBeInTheDocument();
+		fireEvent.keyDown(keyTarget(), { key: 'ArrowDown' });
+		expect(screen.getByText('ultra')).toBeInTheDocument();
 	});
 
 	it('keeps the wrapped-around neighbour on the wheel', async () => {

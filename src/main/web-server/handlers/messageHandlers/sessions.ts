@@ -83,6 +83,7 @@ export function handleCreateSession(
 	if (message.customEffort) config.customEffort = message.customEffort as string;
 	if (message.customContextWindow)
 		config.customContextWindow = message.customContextWindow as number;
+	if (typeof message.customFastMode === 'boolean') config.customFastMode = message.customFastMode;
 	// Provenance for the key above. This allowlist is explicit, so omitting it
 	// would silently drop the CLI's `--context-window` intent - the same failure
 	// mode as the EDITABLE_KEYS allowlist in the remote patch applier (AD1).

@@ -118,6 +118,7 @@ export interface UseAgentExecutionReturn {
 			customEnvVars?: Record<string, string>;
 			customModel?: string;
 			customContextWindow?: number;
+			customFastMode?: boolean;
 			enableMaestroP?: boolean;
 			maestroPMode?: 'interactive' | 'dynamic';
 			maestroPPath?: string;
@@ -142,6 +143,7 @@ export interface UseAgentExecutionReturn {
 					customEnvVars?: Record<string, string>;
 					customModel?: string;
 					customContextWindow?: number;
+					customFastMode?: boolean;
 					enableMaestroP?: boolean;
 					maestroPMode?: 'interactive' | 'dynamic';
 					maestroPPath?: string;
@@ -641,6 +643,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							// whether it was launched from the app or maestro-cli, which passed it.
 							sessionCustomEffort: options?.effortOverride ?? session.customEffort,
 							sessionCustomContextWindow: session.customContextWindow,
+							sessionCustomFastMode: session.customFastMode,
 							// Per-session SSH remote config (takes precedence over agent-level SSH config)
 							sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 							// Origin of the turn. Auto Run is the one dispatcher that reaches
@@ -700,6 +703,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 				customModel?: string;
 				customEffort?: string;
 				customContextWindow?: number;
+				customFastMode?: boolean;
 				// Claude token-source selection. The synopsis spawns under a synthetic
 				// sessionId, so the process:spawn handler can't resolve the token mode
 				// from the persisted session - forward these fields explicitly instead.
@@ -876,6 +880,7 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							sessionCustomModel: synopsisModel,
 							sessionCustomEffort: cheapSynopsis.effort ?? sessionConfig?.customEffort,
 							sessionCustomContextWindow: sessionConfig?.customContextWindow,
+							sessionCustomFastMode: sessionConfig?.customFastMode,
 							// Forward the agent's Claude token source. The synopsis runs under a
 							// synthetic sessionId, so the process:spawn handler can't hydrate the
 							// token mode from the persisted session - it falls back to these.

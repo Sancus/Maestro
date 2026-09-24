@@ -1261,18 +1261,19 @@ describe('agent-detector', () => {
 
 			const models = await detector.discoverModels('codex');
 			// Should include visible models, exclude hidden ones
+			expect(models.slice(0, 2)).toEqual(['gpt-6-sol', 'gpt-6-luna']);
 			expect(models).toContain('gpt-5.4');
 			expect(models).toContain('gpt-5.3-codex');
 			expect(models).toContain('o4-mini');
 			expect(models).not.toContain('gpt-5.1-codex'); // hidden
 			expect(logger.info).toHaveBeenCalledWith(
-				expect.stringContaining('Discovered 3 models'),
+				expect.stringContaining('Discovered 5 models'),
 				'AgentDetector',
 				expect.any(Object)
 			);
 		});
 
-		it('should return empty array when Codex models_cache.json is missing', async () => {
+		it('should return rollout models when Codex models_cache.json is missing', async () => {
 			mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
 				const binaryName = args[0];
 				if (binaryName === 'codex') {
@@ -1292,7 +1293,7 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 
 			const models = await detector.discoverModels('codex');
-			expect(models).toEqual([]);
+			expect(models).toEqual(['gpt-6-sol', 'gpt-6-luna']);
 		});
 
 		it('should discover models for Grok from models_cache.json', async () => {
@@ -2028,12 +2029,14 @@ describe('agent-detector', () => {
 					{
 						slug: 'gpt-5.4',
 						visibility: 'list',
-						supported_reasoning_levels: [
-							{ effort: 'low' },
-							{ effort: 'medium' },
-							{ effort: 'high' },
-							{ effort: 'xhigh' },
-						],
+							supported_reasoning_levels: [
+								{ effort: 'low' },
+								{ effort: 'medium' },
+								{ effort: 'high' },
+								{ effort: 'xhigh' },
+								{ effort: 'max' },
+								{ effort: 'ultra' },
+							],
 					},
 					{
 						slug: 'gpt-5.1-codex-mini',
@@ -2063,7 +2066,16 @@ describe('agent-detector', () => {
 
 			const options = await detector.discoverConfigOptions('codex', 'reasoningEffort');
 			// Should include union of visible models' reasoning levels, sorted by severity
-			expect(options).toEqual(['', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+			expect(options).toEqual([
+				'',
+				'minimal',
+				'low',
+				'medium',
+				'high',
+				'xhigh',
+				'max',
+				'ultra',
+			]);
 			// Hidden model's levels should not be excluded (they share the same platform levels)
 		});
 
@@ -2088,7 +2100,16 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 
 			const options = await detector.discoverConfigOptions('codex', 'reasoningEffort');
-			expect(options).toEqual(['', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+			expect(options).toEqual([
+				'',
+				'minimal',
+				'low',
+				'medium',
+				'high',
+				'xhigh',
+				'max',
+				'ultra',
+			]);
 			expect(logger.debug).toHaveBeenCalledWith(
 				'Could not read Codex models_cache.json for config option discovery',
 				'AgentDetector'

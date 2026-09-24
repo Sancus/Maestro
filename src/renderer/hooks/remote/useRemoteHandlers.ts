@@ -692,6 +692,7 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 						sessionCustomEnvVars: session.customEnvVars,
 						sessionCustomModel: session.customModel,
 						sessionCustomContextWindow: session.customContextWindow,
+						sessionCustomFastMode: session.customFastMode,
 						sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 					});
 				} finally {

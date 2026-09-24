@@ -514,6 +514,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 					sessionCustomModel: turnModel,
 					sessionCustomEffort: turnEffort,
 					sessionCustomContextWindow: session.customContextWindow,
+					sessionCustomFastMode: session.customFastMode,
 					sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 				});
 			} else if (item.type === 'command' && item.command) {
@@ -617,6 +618,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						sessionCustomModel: turnModel,
 						sessionCustomEffort: turnEffort,
 						sessionCustomContextWindow: session.customContextWindow,
+						sessionCustomFastMode: session.customFastMode,
 						sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 					});
 				} else {

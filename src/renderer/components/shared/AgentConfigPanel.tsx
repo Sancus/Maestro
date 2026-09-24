@@ -32,6 +32,7 @@ import { AuthPathValueInput } from './AuthPathValueInput';
 import { EnvVarKeyInput } from './EnvVarKeyInput';
 import { BLANK_ENV_VAR_KEY } from '../../../shared/envVarCatalog';
 import { useKnownEnvVarKeys } from '../../hooks/agent/useKnownEnvVarKeys';
+import { effortsForModel } from '../../../shared/agentConstants';
 
 const MAESTRO_P_INSTALL_URL = 'https://runmaestro.ai/maestro-p/';
 
@@ -1116,7 +1117,15 @@ export function AgentConfigPanel({
 									option.dynamic && dynamicOptions[option.key]?.length
 										? dynamicOptions[option.key]
 										: option.options;
-								if (!opts || opts.length === 0) {
+								const visibleOpts =
+									opts && option.key === 'reasoningEffort'
+										? effortsForModel(
+												agent.id,
+												agentConfig.model || agentConfig.resolvedDefaultModel || '',
+												opts
+											)
+										: opts;
+								if (!visibleOpts || visibleOpts.length === 0) {
 									if (option.dynamic && loadingDynamicOptions) {
 										return (
 											<p className="text-xs" style={{ color: theme.colors.textDim }}>
@@ -1141,7 +1150,7 @@ export function AgentConfigPanel({
 											backgroundColor: theme.colors.bgMain,
 										}}
 									>
-										{opts.map((opt) => (
+										{visibleOpts.map((opt) => (
 											<option
 												key={opt}
 												value={opt}

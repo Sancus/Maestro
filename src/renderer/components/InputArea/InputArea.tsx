@@ -149,6 +149,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		availableEfforts = [],
 		onModelChange,
 		onEffortChange,
+		showCodexControls = false,
+		currentContextWindow,
+		onContextWindowChange,
+		fastMode = false,
+		onFastModeChange,
 	} = props;
 
 	// Self-source thinking items with a narrow store equality so App/MainPanel
@@ -165,6 +170,9 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		effortMenuOpen,
 		setEffortMenuOpen,
 		effortMenuRef,
+		contextMenuOpen,
+		setContextMenuOpen,
+		contextMenuRef,
 	} = useModelEffortMenus();
 
 	// Get agent capabilities for conditional feature rendering
@@ -712,6 +720,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							availableEfforts={availableEfforts}
 							onModelChange={onModelChange}
 							onEffortChange={onEffortChange}
+							showCodexControls={showCodexControls}
+							currentContextWindow={currentContextWindow}
+							onContextWindowChange={onContextWindowChange}
+							fastMode={fastMode}
+							onFastModeChange={onFastModeChange}
 							modelMenuOpen={modelMenuOpen}
 							setModelMenuOpen={setModelMenuOpen}
 							modelMenuRef={modelMenuRef}
@@ -719,6 +732,9 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							setEffortMenuOpen={setEffortMenuOpen}
 							effortMenuRef={effortMenuRef}
 							processInput={processInput}
+							contextMenuOpen={contextMenuOpen}
+							setContextMenuOpen={setContextMenuOpen}
+							contextMenuRef={contextMenuRef}
 						/>
 					</div>
 					{/* Context Warning Sash - AI mode only, appears below input when context usage is high */}

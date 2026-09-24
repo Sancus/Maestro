@@ -2036,6 +2036,7 @@ describe('agentStore', () => {
 				customEnvVars: { MY_VAR: 'value' },
 				customModel: 'claude-opus',
 				customContextWindow: 200000,
+				customFastMode: true,
 				aiTabs: [
 					{
 						id: 'tab-1',
@@ -2064,6 +2065,7 @@ describe('agentStore', () => {
 					sessionCustomEnvVars: { MY_VAR: 'value' },
 					sessionCustomModel: 'claude-opus',
 					sessionCustomContextWindow: 200000,
+					sessionCustomFastMode: true,
 				})
 			);
 		});

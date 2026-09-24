@@ -1,12 +1,16 @@
 import type { AgentConfig, AgentDefinition } from '../agents';
 import type { AdditionalDirectory } from '../../shared/types';
+import {
+	DEFAULT_CODEX_CONTEXT_WINDOW,
+	EXTENDED_1M_CONTEXT_WINDOW,
+} from '../../shared/agentConstants';
 import { logger } from './logger';
 
 /** Fields applyAgentConfigOverrides actually reads. Accepting this narrower
  * shape lets CLI callers pass AgentDefinition (no capabilities/available). */
 type AgentConfigOverridable = Pick<
 	AgentConfig,
-	'configOptions' | 'defaultEnvVars' | 'readOnlyArgs'
+	'id' | 'configOptions' | 'defaultEnvVars' | 'readOnlyArgs'
 >;
 
 const LOG_CONTEXT = '[AgentArgs]';
@@ -45,6 +49,8 @@ type AgentConfigOverrides = {
 	agentConfigValues?: Record<string, any>;
 	sessionCustomModel?: string;
 	sessionCustomEffort?: string;
+	sessionCustomContextWindow?: number;
+	sessionCustomFastMode?: boolean;
 	sessionCustomArgs?: string;
 	sessionCustomEnvVars?: Record<string, string>;
 	/**
@@ -383,6 +389,24 @@ export function applyAgentConfigOverrides(
 		finalArgs = [...finalArgs, ...parsedCustomArgs];
 	} else {
 		customArgsSource = 'none';
+	}
+
+	// Codex reads both settings from config overrides. Keep these last so a
+	// session's composer pills take precedence over global config and custom
+	// args. An unset fast preference is explicitly OFF, preventing a global
+	// `fast_mode = true` from leaking into agents that did not opt in.
+	if (agent?.id === 'codex') {
+		const contextWindow =
+			overrides.sessionCustomContextWindow === EXTENDED_1M_CONTEXT_WINDOW
+				? EXTENDED_1M_CONTEXT_WINDOW
+				: DEFAULT_CODEX_CONTEXT_WINDOW;
+		finalArgs = [...finalArgs, '-c', `model_context_window=${contextWindow}`];
+
+		if (overrides.sessionCustomFastMode === true) {
+			finalArgs = [...finalArgs, '-c', 'service_tier="fast"', '-c', 'features.fast_mode=true'];
+		} else {
+			finalArgs = [...finalArgs, '-c', 'service_tier="default"', '-c', 'features.fast_mode=false'];
+		}
 	}
 
 	// Env vars: agent defaults (lowest), then ONE user-configured set on top. The

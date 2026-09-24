@@ -381,6 +381,7 @@ export function useAgentExitListener(deps: UseAgentExitListenerDeps): void {
 								customEnvVars: currentSession.customEnvVars,
 								customModel: runModelOverride ?? currentSession.customModel,
 								customContextWindow: currentSession.customContextWindow,
+								customFastMode: currentSession.customFastMode,
 								// Carry the agent's Claude token source into the synopsis spawn so
 								// it resolves the same TUI/Dynamic/API mode as a normal turn.
 								// Shared extractor guarantees the SAME complete triple - no

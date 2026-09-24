@@ -41,8 +41,7 @@
  * Options and the tab > session > agent-default ladder come from the same hook
  * and resolver the composer pills use, so the two surfaces can't disagree about
  * what this agent offers or what the tab is currently running. Effort is
- * agent-scoped rather than model-scoped, which matches the underlying CLIs: a
- * model that ignores reasoning effort simply drops the flag.
+ * fetched at agent scope, then narrowed for models with a smaller effort range.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -60,6 +59,7 @@ import {
 import { getModelFamily } from '../utils/modelFamily';
 import { readableTextOn } from '../../shared/colorContrast';
 import { getAgentDisplayName } from '../../shared/agentMetadata';
+import { effortsForModel } from '../../shared/agentConstants';
 import { getTabDisplayName } from '../utils/tabHelpers';
 import { selectActiveSession, useSessionStore } from '../stores/sessionStore';
 import { useTabStore } from '../stores/tabStore';
@@ -167,11 +167,6 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 	// '' (inherit the agent default) is always offered as the first choice, the
 	// same way the composer pills offer it.
 	const modelOptions = useMemo(() => (models.includes('') ? models : ['', ...models]), [models]);
-	const effortOptions = useMemo(() => {
-		if (efforts.length === 0) return [];
-		return efforts.includes('') ? efforts : ['', ...efforts];
-	}, [efforts]);
-
 	// State holds only what the USER picked; until they move, the selection IS
 	// the tab's current value. Seeding an index from an effect instead would
 	// leave a window right after open where the highlight sits on '(default)'
@@ -179,6 +174,11 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 	// window would clear the override the user came here to nudge.
 	const [pickedModel, setPickedModel] = useState<string | null>(null);
 	const [pickedEffort, setPickedEffort] = useState<string | null>(null);
+	const effortOptions = useMemo(() => {
+		const supported = effortsForModel(agentId, pickedModel ?? currentModel, efforts);
+		if (supported.length === 0) return [];
+		return supported.includes('') ? supported : ['', ...supported];
+	}, [agentId, efforts, pickedModel, currentModel]);
 
 	const selectedModel = pickedModel ?? currentModel;
 	const selectedEffort = pickedEffort ?? currentEffort;

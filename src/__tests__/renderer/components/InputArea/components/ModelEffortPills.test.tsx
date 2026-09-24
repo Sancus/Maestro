@@ -79,6 +79,61 @@ describe('ModelEffortPills', () => {
 		expect(setEffortMenuOpen).toHaveBeenCalledWith(false);
 	});
 
+	describe('Codex agent controls', () => {
+		const codexProps = {
+			showCodexControls: true,
+			currentContextWindow: 272_000,
+			onContextWindowChange: vi.fn(),
+			fastMode: false,
+			onFastModeChange: vi.fn(),
+			contextMenuOpen: false,
+			setContextMenuOpen: vi.fn(),
+			contextMenuRef: { current: null },
+		};
+
+		it('hides context and fast pills for non-Codex agents', () => {
+			renderPills();
+
+			expect(screen.queryByTitle('Change maximum context size')).not.toBeInTheDocument();
+			expect(screen.queryByTitle(/Fast mode:/)).not.toBeInTheDocument();
+		});
+
+		it('shows the active context size and toggles its menu', () => {
+			const setContextMenuOpen = vi.fn();
+			renderPills({ ...codexProps, setContextMenuOpen });
+
+			fireEvent.click(screen.getByTitle('Change maximum context size'));
+
+			expect(screen.getByText('272K')).toBeInTheDocument();
+			expect(setContextMenuOpen).toHaveBeenCalledWith(true);
+		});
+
+		it('selects 1M context and closes the menu', () => {
+			const onContextWindowChange = vi.fn();
+			const setContextMenuOpen = vi.fn();
+			renderPills({
+				...codexProps,
+				contextMenuOpen: true,
+				onContextWindowChange,
+				setContextMenuOpen,
+			});
+
+			fireEvent.click(screen.getByText('1M'));
+
+			expect(onContextWindowChange).toHaveBeenCalledWith(1_000_000);
+			expect(setContextMenuOpen).toHaveBeenCalledWith(false);
+		});
+
+		it('toggles fast mode per agent', () => {
+			const onFastModeChange = vi.fn();
+			renderPills({ ...codexProps, onFastModeChange });
+
+			fireEvent.click(screen.getByTitle('Fast mode: off'));
+
+			expect(onFastModeChange).toHaveBeenCalledWith(true);
+		});
+	});
+
 	describe('shortcut hint header', () => {
 		it('renders the hint at the top of both menus when one is supplied', () => {
 			const { unmount } = renderPills({ modelMenuOpen: true, shortcutKeys: HINT_KEYS });

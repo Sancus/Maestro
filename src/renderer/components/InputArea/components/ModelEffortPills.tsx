@@ -3,6 +3,7 @@ import type React from 'react';
 import { Gauge, Sparkles } from 'lucide-react';
 import type { Theme } from '../../../types';
 import { ShortcutHint, shortcutSuffix } from '../../ui/ShortcutHint';
+import { CODEX_CONTEXT_WINDOWS } from '../../../../shared/agentConstants';
 
 interface ModelEffortPillsProps {
 	isVisible: boolean;
@@ -24,12 +25,20 @@ interface ModelEffortPillsProps {
 	availableEfforts: string[];
 	onModelChange?: (model: string) => void;
 	onEffortChange?: (effort: string) => void;
+	showCodexControls?: boolean;
+	currentContextWindow?: number;
+	onContextWindowChange?: (contextWindow: number) => void;
+	fastMode?: boolean;
+	onFastModeChange?: (enabled: boolean) => void;
 	modelMenuOpen: boolean;
 	setModelMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
 	modelMenuRef: React.RefObject<HTMLDivElement>;
 	effortMenuOpen: boolean;
 	setEffortMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
 	effortMenuRef: React.RefObject<HTMLDivElement>;
+	contextMenuOpen?: boolean;
+	setContextMenuOpen?: React.Dispatch<React.SetStateAction<boolean>>;
+	contextMenuRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const ModelEffortPills = memo(function ModelEffortPills({
@@ -42,12 +51,20 @@ export const ModelEffortPills = memo(function ModelEffortPills({
 	availableEfforts,
 	onModelChange,
 	onEffortChange,
+	showCodexControls = false,
+	currentContextWindow = CODEX_CONTEXT_WINDOWS[0],
+	onContextWindowChange,
+	fastMode = false,
+	onFastModeChange,
 	modelMenuOpen,
 	setModelMenuOpen,
 	modelMenuRef,
 	effortMenuOpen,
 	setEffortMenuOpen,
 	effortMenuRef,
+	contextMenuOpen = false,
+	setContextMenuOpen,
+	contextMenuRef,
 }: ModelEffortPillsProps) {
 	if (!isVisible) {
 		return null;
@@ -61,6 +78,7 @@ export const ModelEffortPills = memo(function ModelEffortPills({
 						onClick={() => {
 							setModelMenuOpen(!modelMenuOpen);
 							setEffortMenuOpen(false);
+							setContextMenuOpen?.(false);
 						}}
 						className="flex items-center gap-1 text-2xs px-2 py-1 rounded-full cursor-pointer transition-all opacity-60 hover:opacity-100"
 						style={{
@@ -113,6 +131,7 @@ export const ModelEffortPills = memo(function ModelEffortPills({
 						onClick={() => {
 							setEffortMenuOpen(!effortMenuOpen);
 							setModelMenuOpen(false);
+							setContextMenuOpen?.(false);
 						}}
 						className="flex items-center gap-1 text-2xs px-2 py-1 rounded-full cursor-pointer transition-all opacity-60 hover:opacity-100"
 						style={{
@@ -157,6 +176,76 @@ export const ModelEffortPills = memo(function ModelEffortPills({
 						</div>
 					)}
 				</div>
+			)}
+			{showCodexControls && onContextWindowChange && setContextMenuOpen && contextMenuRef && (
+				<div className="relative" ref={contextMenuRef} data-tour="context-window-selector">
+					<button
+						onClick={() => {
+							setContextMenuOpen(!contextMenuOpen);
+							setModelMenuOpen(false);
+							setEffortMenuOpen(false);
+						}}
+						className="flex items-center gap-1 text-2xs px-2 py-1 rounded-full cursor-pointer transition-all opacity-60 hover:opacity-100"
+						style={{
+							backgroundColor: `${theme.colors.accent}10`,
+							color: theme.colors.accent,
+							border: `1px solid ${theme.colors.accent}25`,
+						}}
+						title="Change maximum context size"
+					>
+						<span className="font-semibold">CTX</span>
+						<span>{currentContextWindow === 1_000_000 ? '1M' : '272K'}</span>
+					</button>
+					{contextMenuOpen && (
+						<div
+							className="absolute bottom-full left-0 mb-1 rounded border shadow-lg z-50"
+							style={{
+								backgroundColor: theme.colors.bgMain,
+								borderColor: theme.colors.border,
+							}}
+						>
+							{CODEX_CONTEXT_WINDOWS.map((contextWindow) => (
+								<button
+									key={contextWindow}
+									onClick={() => {
+										onContextWindowChange(contextWindow);
+										setContextMenuOpen(false);
+									}}
+									className="w-full text-left px-3 py-1.5 text-xs whitespace-nowrap hover:bg-white/10 transition-colors"
+									style={{
+										color:
+											contextWindow === currentContextWindow
+												? theme.colors.accent
+												: theme.colors.textMain,
+										backgroundColor:
+											contextWindow === currentContextWindow ? 'rgba(255,255,255,0.05)' : undefined,
+									}}
+								>
+									{contextWindow === 1_000_000 ? '1M' : '272K'}
+								</button>
+							))}
+						</div>
+					)}
+				</div>
+			)}
+			{showCodexControls && onFastModeChange && (
+				<button
+					onClick={() => onFastModeChange(!fastMode)}
+					className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-full cursor-pointer transition-all ${
+						fastMode ? '' : 'opacity-40 hover:opacity-70'
+					}`}
+					style={{
+						backgroundColor: fastMode ? `${theme.colors.warning}25` : 'transparent',
+						color: fastMode ? theme.colors.warning : theme.colors.textDim,
+						border: fastMode
+							? `1px solid ${theme.colors.warning}50`
+							: `1px solid ${theme.colors.border}`,
+					}}
+					title={`Fast mode: ${fastMode ? 'on' : 'off'}`}
+					aria-pressed={fastMode}
+				>
+					<span>Fast</span>
+				</button>
 			)}
 		</>
 	);

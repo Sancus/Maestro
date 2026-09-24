@@ -521,6 +521,7 @@ You are taking over this conversation. Based on the context above, provide a bri
 						sessionCustomEnvVars: targetSession.customEnvVars,
 						sessionCustomModel: targetSession.customModel,
 						sessionCustomContextWindow: targetSession.customContextWindow,
+						sessionCustomFastMode: targetSession.customFastMode,
 						sessionSshRemoteConfig: targetSession.sessionSshRemoteConfig,
 						// Windows stdin handling - context transfer prompts contain the
 						// full conversation history and can easily exceed shell limits
