@@ -60,6 +60,7 @@ import { formatMetaKey } from '../utils/shortcutFormatter';
 import { logger } from '../utils/logger';
 import { ResizeHandles } from './ui/ResizeHandles';
 import { effortsForModel } from '../../shared/agentConstants';
+import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 
 // Re-export for external consumers
 export { DEFAULT_BATCH_PROMPT, validateAgentPromptHasTaskReference } from '../hooks';
@@ -197,7 +198,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 				if (!stale) setAgentDefaultModel('');
 			});
 		window.maestro.agents
-			.getModels(agentId)
+			.getModels(agentId, false, getSessionSshRemoteId(activeSession))
 			.then((models) => {
 				if (!stale) setAvailableModels(models);
 			})
@@ -223,7 +224,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 		return () => {
 			stale = true;
 		};
-	}, [activeSession?.toolType]);
+	}, [
+		activeSession?.toolType,
+		activeSession?.sshRemoteId,
+		activeSession?.sessionSshRemoteConfig?.remoteId,
+	]);
 
 	// Drop a picked value that the newly fetched option list no longer offers,
 	// so switching agents can't leave a stale model in the launched config.

@@ -6,6 +6,7 @@ import { resilienceEnabled } from '../../../shared/agentConstants';
 import { normalizeAdditionalDirectories } from '../../../shared/additionalDirectories';
 import { formatTokensCompact } from '../../../shared/formatters';
 import { getActiveTab } from '../../utils/tabHelpers';
+import { getSessionSshRemoteId } from '../../utils/sessionHelpers';
 import { useSessionStore, selectSessionById } from '../../stores/sessionStore';
 import {
 	resolveContextWindow,
@@ -170,13 +171,7 @@ export function EditAgentModal({
 					const requestId = ++modelRequestIdRef.current;
 					setLoadingModels(true);
 					window.maestro.agents
-						.getModels(
-							activeToolType,
-							false,
-							session.sessionSshRemoteConfig?.enabled
-								? (session.sessionSshRemoteConfig.remoteId ?? undefined)
-								: undefined
-						)
+						.getModels(activeToolType, false, getSessionSshRemoteId(session))
 						.then((models) => {
 							if (!stale && modelRequestIdRef.current === requestId) {
 								setAvailableModels(models);
@@ -278,13 +273,14 @@ export function EditAgentModal({
 		// disabled, so the checkbox can stay toggled on for locally-executed
 		// agents that are controlled by another Maestro instance over SSH.
 		const persisted = session.sessionSshRemoteConfig;
-		if (persisted?.enabled && persisted.remoteId) {
+		const sessionRemoteId = getSessionSshRemoteId(session);
+		if (sessionRemoteId) {
 			setSshRemoteConfig({
 				enabled: true,
-				remoteId: persisted.remoteId,
-				workingDirOverride: persisted.workingDirOverride,
-				syncHistory: persisted.syncHistory,
-				shareHistoryToProjectDir: persisted.shareHistoryToProjectDir,
+				remoteId: sessionRemoteId,
+				workingDirOverride: persisted?.workingDirOverride,
+				syncHistory: persisted?.syncHistory,
+				shareHistoryToProjectDir: persisted?.shareHistoryToProjectDir,
 			});
 		} else if (persisted?.shareHistoryToProjectDir) {
 			setSshRemoteConfig({

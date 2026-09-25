@@ -13,6 +13,7 @@ import {
 	useAgentModelEffortOptions,
 	resolveModelEffort,
 } from '../../hooks/agent/useAgentModelEffortOptions';
+import { getSessionSshRemoteId } from '../../utils/sessionHelpers';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore, selectActiveSession, updateSessionWith } from '../../stores/sessionStore';
 import { useTabStore } from '../../stores/tabStore';
@@ -411,7 +412,7 @@ export const MainPanel = React.memo(
 			efforts: pillEfforts,
 			defaultModel: agentDefaultModel,
 			defaultEffort: agentDefaultEffort,
-		} = useAgentModelEffortOptions(activeSession?.toolType);
+		} = useAgentModelEffortOptions(activeSession?.toolType, getSessionSshRemoteId(activeSession));
 		const setSessions = useSessionStore((s) => s.setSessions);
 		const updateSession = useSessionStore((s) => s.updateSession);
 

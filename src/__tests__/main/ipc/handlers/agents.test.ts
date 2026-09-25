@@ -1437,6 +1437,23 @@ describe('agents IPC handlers', () => {
 				expect(result).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
 			});
 
+			it('falls back to Claude aliases when SSH model discovery fails', async () => {
+				mockSettingsStore.get.mockReturnValue([
+					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
+				]);
+				vi.mocked(buildSshCommand).mockResolvedValue({ command: 'ssh', args: [] });
+				vi.mocked(execFileNoThrow).mockResolvedValue({
+					exitCode: 255,
+					stdout: '',
+					stderr: 'Connection closed',
+				});
+
+				const handler = handlers.get('agents:getModels');
+				const result = await handler!({} as any, 'claude-code', true, 'remote-claude');
+
+				expect(result).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
+			});
+
 			it('should discover models on SSH remote when sshRemoteId is provided', async () => {
 				mockSettingsStore.get.mockReturnValue([
 					{

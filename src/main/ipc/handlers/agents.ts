@@ -1737,9 +1737,21 @@ export function registerAgentsHandlers(deps: AgentsHandlerDependencies): void {
 				if (sshRemoteId) {
 					const sshConfig = getSshRemoteById(settingsStore, sshRemoteId);
 					if (!sshConfig) {
+						if (agentId === 'claude-code') return [...CLAUDE_MODEL_ALIASES];
 						throw new Error(`SSH remote not found: ${sshRemoteId}`);
 					}
-					return discoverModelsRemote(agentId, sshConfig, forceRefresh ?? false);
+					try {
+						const models = await discoverModelsRemote(agentId, sshConfig, forceRefresh ?? false);
+						return agentId === 'claude-code' && models.length === 0
+							? [...CLAUDE_MODEL_ALIASES]
+							: models;
+					} catch (error) {
+						if (agentId !== 'claude-code') throw error;
+						logger.warn(`Failed to discover Claude models on ${sshConfig.host}`, LOG_CONTEXT, {
+							error,
+						});
+						return [...CLAUDE_MODEL_ALIASES];
+					}
 				}
 
 				// Local discovery

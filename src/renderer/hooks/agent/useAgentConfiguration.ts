@@ -22,7 +22,7 @@ declare const window: Window & {
 			detect: (sshRemoteId?: string) => Promise<AgentConfig[]>;
 			getConfig: (agentId: string) => Promise<Record<string, any> | null>;
 			setConfig: (agentId: string, config: Record<string, any>) => Promise<boolean>;
-			getModels: (agentId: string, force?: boolean) => Promise<string[]>;
+			getModels: (agentId: string, force?: boolean, sshRemoteId?: string) => Promise<string[]>;
 			getConfigOptions: (agentId: string, optionKey: string, force?: boolean) => Promise<string[]>;
 			refresh: (agentId: string) => Promise<void>;
 		};
@@ -249,7 +249,11 @@ export function useAgentConfiguration(
 			if (agent?.capabilities?.supportsModelSelection) {
 				setLoadingModels(true);
 				try {
-					const models = await window.maestro.agents.getModels(agentId);
+					const models = await window.maestro.agents.getModels(
+						agentId,
+						false,
+						sshRemoteConfig?.enabled ? (sshRemoteConfig.remoteId ?? undefined) : undefined
+					);
 					if (latestLoadRequestRef.current !== requestId) return; // stale
 					setAvailableModels(models);
 				} catch (err) {
@@ -290,7 +294,7 @@ export function useAgentConfiguration(
 				}
 			}
 		},
-		[detectedAgents]
+		[detectedAgents, sshRemoteConfig?.enabled, sshRemoteConfig?.remoteId]
 	);
 
 	// Save agent config via IPC
@@ -303,14 +307,18 @@ export function useAgentConfiguration(
 		if (!selectedAgent) return;
 		setLoadingModels(true);
 		try {
-			const models = await window.maestro.agents.getModels(selectedAgent, true);
+			const models = await window.maestro.agents.getModels(
+				selectedAgent,
+				true,
+				sshRemoteConfig?.enabled ? (sshRemoteConfig.remoteId ?? undefined) : undefined
+			);
 			setAvailableModels(models);
 		} catch (err) {
 			logger.error('Failed to refresh models:', undefined, err);
 		} finally {
 			setLoadingModels(false);
 		}
-	}, [selectedAgent]);
+	}, [selectedAgent, sshRemoteConfig?.enabled, sshRemoteConfig?.remoteId]);
 
 	// Refresh agent detection
 	const refreshAgent = useCallback(async () => {
