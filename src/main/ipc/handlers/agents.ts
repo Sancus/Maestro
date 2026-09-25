@@ -62,7 +62,11 @@ import {
 import type { CodexResetCreditConsumeResult } from '../../../shared/codexResetCredits';
 import type { KnownAuthDirs } from '../../../shared/authPaths';
 import { rememberableEnvVarKeys, type KnownEnvVarKeys } from '../../../shared/envVarCatalog';
-import { CLAUDE_MODEL_ALIASES, mergeCodexModels } from '../../../shared/agentConstants';
+import {
+	CLAUDE_MODEL_CHOICES,
+	mergeClaudeModels,
+	mergeCodexModels,
+} from '../../../shared/agentConstants';
 import { readCodexConfig } from '../../parsers/codex-output-parser';
 
 const LOG_CONTEXT = '[AgentDetector]';
@@ -840,16 +844,10 @@ async function discoverModelsRemote(
 		const sanitizedStdout = stripAnsi(result.stdout);
 
 		if (agentId === 'claude-code') {
-			models.push(...CLAUDE_MODEL_ALIASES);
-			for (const model of models) seen.add(model);
+			models.push(...CLAUDE_MODEL_CHOICES);
 			try {
 				const stats = parseJsonWithBom<{ modelUsage?: Record<string, unknown> }>(sanitizedStdout);
-				for (const model of Object.keys(stats.modelUsage ?? {})) {
-					if (!seen.has(model)) {
-						seen.add(model);
-						models.push(model);
-					}
-				}
+				models.splice(0, models.length, ...mergeClaudeModels(Object.keys(stats.modelUsage ?? {})));
 			} catch {
 				// A fresh remote Claude install may not have written stats yet.
 			}
@@ -1737,20 +1735,20 @@ export function registerAgentsHandlers(deps: AgentsHandlerDependencies): void {
 				if (sshRemoteId) {
 					const sshConfig = getSshRemoteById(settingsStore, sshRemoteId);
 					if (!sshConfig) {
-						if (agentId === 'claude-code') return [...CLAUDE_MODEL_ALIASES];
+						if (agentId === 'claude-code') return [...CLAUDE_MODEL_CHOICES];
 						throw new Error(`SSH remote not found: ${sshRemoteId}`);
 					}
 					try {
 						const models = await discoverModelsRemote(agentId, sshConfig, forceRefresh ?? false);
 						return agentId === 'claude-code' && models.length === 0
-							? [...CLAUDE_MODEL_ALIASES]
+							? [...CLAUDE_MODEL_CHOICES]
 							: models;
 					} catch (error) {
 						if (agentId !== 'claude-code') throw error;
 						logger.warn(`Failed to discover Claude models on ${sshConfig.host}`, LOG_CONTEXT, {
 							error,
 						});
-						return [...CLAUDE_MODEL_ALIASES];
+						return [...CLAUDE_MODEL_CHOICES];
 					}
 				}
 

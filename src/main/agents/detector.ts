@@ -38,7 +38,11 @@ import {
 	primeOmpModelCatalog,
 	buildOmpPrimeEnv,
 } from './omp-model-catalog';
-import { CLAUDE_MODEL_ALIASES, mergeCodexModels } from '../../shared/agentConstants';
+import {
+	CLAUDE_MODEL_CHOICES,
+	mergeClaudeModels,
+	mergeCodexModels,
+} from '../../shared/agentConstants';
 
 const LOG_CONTEXT = 'AgentDetector';
 
@@ -416,25 +420,16 @@ export class AgentDetector {
 			switch (agentId) {
 				case 'claude-code': {
 					// Claude Code: no CLI listing command.
-					// Discover models dynamically from two sources:
-					// 1. Well-known aliases (always valid, resolve to latest in each tier)
-					//    Includes [1m] variants for 1M extended context window
-					//    (requires extra usage enabled at claude.ai/settings/usage).
-					//    fable has no [1m] variant (Claude Code exposes 1M only for opus/sonnet).
-					// 2. Historical model usage from ~/.claude/stats-cache.json
-					const models: string[] = [...CLAUDE_MODEL_ALIASES];
+					// Offer pinned versions, plus matching IDs from local model history.
+					// Older families in stats-cache.json do not belong in this selector.
+					let models: string[] = [...CLAUDE_MODEL_CHOICES];
 					try {
 						const statsPath = path.join(os.homedir(), '.claude', 'stats-cache.json');
 						const statsContent = fs.readFileSync(statsPath, 'utf8');
 						const stats = JSON.parse(statsContent);
 						// modelUsage keys are full model IDs the user has used
-						if (stats.modelUsage && typeof stats.modelUsage === 'object') {
-							for (const modelId of Object.keys(stats.modelUsage)) {
-								if (!models.includes(modelId)) {
-									models.push(modelId);
-								}
-							}
-						}
+						if (stats.modelUsage && typeof stats.modelUsage === 'object')
+							models = mergeClaudeModels(Object.keys(stats.modelUsage));
 					} catch {
 						// stats-cache.json may not exist yet (fresh install)
 						logger.debug('Could not read Claude stats-cache.json for model discovery', LOG_CONTEXT);

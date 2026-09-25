@@ -12,15 +12,29 @@ import type { AgentCapabilitiesSnapshot } from './agentCapabilities';
 export const CODEX_CONTEXT_WINDOWS = [272_000, 1_000_000] as const;
 export const DEFAULT_CODEX_CONTEXT_WINDOW = CODEX_CONTEXT_WINDOWS[0];
 
-/** Claude Code model aliases offered even when no model history exists. */
-export const CLAUDE_MODEL_ALIASES = [
-	'fable',
-	'sonnet',
-	'opus',
-	'haiku',
-	'opus[1m]',
-	'sonnet[1m]',
+/**
+ * Versioned Claude Code models offered even when no model history exists.
+ * The [1m] spellings are explicit CLI selectors; these models already have
+ * native 1M context when used directly through the Anthropic API.
+ */
+export const CLAUDE_MODEL_CHOICES = [
+	'claude-fable-5-1',
+	'claude-fable-5-1[1m]',
+	'claude-opus-5-5',
+	'claude-opus-5-5[1m]',
+	'claude-opus-5',
+	'claude-opus-5[1m]',
 ] as const;
+
+/** Add matching model IDs seen in Claude history without resurfacing other families. */
+export function mergeClaudeModels(discovered: readonly string[]): string[] {
+	const choices = new Set<string>(CLAUDE_MODEL_CHOICES);
+	for (const model of discovered) {
+		const version = model.replace(/\[1m\]$/i, '').replace(/-\d{8}$/, '');
+		if (CLAUDE_MODEL_CHOICES.some((choice) => choice === version)) choices.add(model);
+	}
+	return [...choices];
+}
 
 /**
  * Codex models announced for the current staged rollout. Keep these available

@@ -108,12 +108,12 @@ describe('ModelEffortModal', () => {
 		expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code', false, 'remote-1');
 	});
 
-	it('offers Claude aliases if model discovery returns no choices', async () => {
+	it('offers versioned Claude models if discovery returns no choices', async () => {
 		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
 		renderModal();
-		await screen.findByText('sonnet');
-		expect(screen.getByText('opus')).toBeInTheDocument();
+		await screen.findByText('claude-fable-5-1');
+		expect(screen.getByText('claude-fable-5-1[1m]')).toBeInTheDocument();
 	});
 
 	it('moves the model with Up/Down and the effort with Left/Right, committing both on Enter', async () => {
