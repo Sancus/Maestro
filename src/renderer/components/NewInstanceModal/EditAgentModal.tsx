@@ -65,6 +65,7 @@ export function EditAgentModal({
 	const seededContextWindowRef = useRef<number | undefined>(undefined);
 	const [availableModels, setAvailableModels] = useState<string[]>([]);
 	const [loadingModels, setLoadingModels] = useState(false);
+	const modelRequestIdRef = useRef(0);
 	const [customPath, setCustomPath] = useState('');
 	const [customArgs, setCustomArgs] = useState('');
 	const [customEnvVars, setCustomEnvVars] = useState<Record<string, string>>({});
@@ -166,15 +167,26 @@ export function EditAgentModal({
 
 				// Load models if agent supports model selection
 				if (foundAgent?.capabilities?.supportsModelSelection) {
+					const requestId = ++modelRequestIdRef.current;
 					setLoadingModels(true);
 					window.maestro.agents
-						.getModels(activeToolType)
+						.getModels(
+							activeToolType,
+							false,
+							session.sessionSshRemoteConfig?.enabled
+								? (session.sessionSshRemoteConfig.remoteId ?? undefined)
+								: undefined
+						)
 						.then((models) => {
-							if (!stale) setAvailableModels(models);
+							if (!stale && modelRequestIdRef.current === requestId) {
+								setAvailableModels(models);
+							}
 						})
 						.catch((err) => logger.error('Failed to load models:', undefined, err))
 						.finally(() => {
-							if (!stale) setLoadingModels(false);
+							if (!stale && modelRequestIdRef.current === requestId) {
+								setLoadingModels(false);
+							}
 						});
 				} else {
 					setAvailableModels([]);
@@ -586,18 +598,32 @@ export function EditAgentModal({
 	]);
 
 	// Refresh available models
-	const refreshModels = useCallback(async () => {
-		if (!agent?.capabilities?.supportsModelSelection) return;
-		setLoadingModels(true);
-		try {
-			const models = await window.maestro.agents.getModels(selectedToolType, true);
-			setAvailableModels(models);
-		} catch (err) {
-			logger.error('Failed to refresh models:', undefined, err);
-		} finally {
-			setLoadingModels(false);
-		}
-	}, [selectedToolType, agent]);
+	const refreshModels = useCallback(
+		async (remoteIdOverride?: string | null) => {
+			if (!agent?.capabilities?.supportsModelSelection) return;
+			const requestId = ++modelRequestIdRef.current;
+			setLoadingModels(true);
+			try {
+				const remoteId =
+					remoteIdOverride !== undefined
+						? remoteIdOverride
+						: sshRemoteConfig?.enabled
+							? sshRemoteConfig.remoteId
+							: null;
+				const models = await window.maestro.agents.getModels(
+					selectedToolType,
+					true,
+					remoteId ?? undefined
+				);
+				if (modelRequestIdRef.current === requestId) setAvailableModels(models);
+			} catch (err) {
+				logger.error('Failed to refresh models:', undefined, err);
+			} finally {
+				if (modelRequestIdRef.current === requestId) setLoadingModels(false);
+			}
+		},
+		[selectedToolType, agent, sshRemoteConfig]
+	);
 
 	// Refresh agent detection
 	const handleRefreshAgent = useCallback(async () => {
@@ -929,7 +955,7 @@ export function EditAgentModal({
 							}}
 							availableModels={availableModels}
 							loadingModels={loadingModels}
-							onRefreshModels={refreshModels}
+							onRefreshModels={() => void refreshModels()}
 							dynamicOptions={editDynamicOptions}
 							loadingDynamicOptions={editLoadingDynamicOptions}
 							onRefreshAgent={handleRefreshAgent}
@@ -963,7 +989,11 @@ export function EditAgentModal({
 					theme={theme}
 					sshRemotes={sshRemotes}
 					sshRemoteConfig={sshRemoteConfig}
-					onSshRemoteConfigChange={setSshRemoteConfig}
+					onSshRemoteConfigChange={(config) => {
+						setSshRemoteConfig(config);
+						setAvailableModels([]);
+						void refreshModels(config.enabled ? config.remoteId : null);
+					}}
 				/>
 			</div>
 		</Modal>

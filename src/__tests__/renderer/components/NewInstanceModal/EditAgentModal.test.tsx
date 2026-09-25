@@ -1052,6 +1052,41 @@ describe('EditAgentModal', () => {
 		});
 	});
 
+	it('loads models from the edited agent SSH host', async () => {
+		vi.mocked(window.maestro.agents.detect).mockResolvedValue([
+			{
+				id: 'claude-code',
+				name: 'Claude Code',
+				available: true,
+				path: '/usr/local/bin/claude',
+				binaryName: 'claude',
+				hidden: false,
+				capabilities: { supportsModelSelection: true },
+			} as AgentConfig,
+		]);
+
+		render(
+			<EditAgentModal
+				isOpen={true}
+				onClose={onClose}
+				onSave={onSave}
+				theme={theme}
+				session={createSession({
+					sessionSshRemoteConfig: { enabled: true, remoteId: 'remote-1' },
+				})}
+				existingSessions={[]}
+			/>
+		);
+
+		await waitFor(() => {
+			expect(window.maestro.agents.getModels).toHaveBeenCalledWith(
+				'claude-code',
+				false,
+				'remote-1'
+			);
+		});
+	});
+
 	// Finding AD1: provenance for `customContextWindow`.
 	describe('context window provenance (finding AD1)', () => {
 		const agentWithWindow = {

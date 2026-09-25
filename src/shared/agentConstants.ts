@@ -12,6 +12,16 @@ import type { AgentCapabilitiesSnapshot } from './agentCapabilities';
 export const CODEX_CONTEXT_WINDOWS = [272_000, 1_000_000] as const;
 export const DEFAULT_CODEX_CONTEXT_WINDOW = CODEX_CONTEXT_WINDOWS[0];
 
+/** Claude Code model aliases offered even when no model history exists. */
+export const CLAUDE_MODEL_ALIASES = [
+	'fable',
+	'sonnet',
+	'opus',
+	'haiku',
+	'opus[1m]',
+	'sonnet[1m]',
+] as const;
+
 /**
  * Codex models announced for the current staged rollout. Keep these available
  * even before a particular Codex installation refreshes models_cache.json;

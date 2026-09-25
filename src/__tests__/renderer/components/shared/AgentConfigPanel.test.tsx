@@ -337,6 +337,22 @@ describe('AgentConfigPanel', () => {
 			expect(screen.getByText('Clear')).toBeInTheDocument();
 		});
 
+		it('shows every model when opening a dropdown with a selected model', () => {
+			render(
+				<AgentConfigPanel
+					{...createDefaultProps({
+						agent: modelAgent,
+						agentConfig: { model: 'claude-opus-5-5' },
+						availableModels: ['claude-opus-5-5', 'sonnet', 'haiku'],
+					})}
+				/>
+			);
+
+			fireEvent.click(screen.getByRole('button', { name: /show models/i }));
+			expect(screen.getByRole('button', { name: 'sonnet' })).toBeInTheDocument();
+			expect(screen.getByRole('button', { name: 'haiku' })).toBeInTheDocument();
+		});
+
 		it('should NOT show Clear button when model is empty', () => {
 			render(
 				<AgentConfigPanel

@@ -38,7 +38,7 @@ import {
 	primeOmpModelCatalog,
 	buildOmpPrimeEnv,
 } from './omp-model-catalog';
-import { mergeCodexModels } from '../../shared/agentConstants';
+import { CLAUDE_MODEL_ALIASES, mergeCodexModels } from '../../shared/agentConstants';
 
 const LOG_CONTEXT = 'AgentDetector';
 
@@ -422,7 +422,7 @@ export class AgentDetector {
 					//    (requires extra usage enabled at claude.ai/settings/usage).
 					//    fable has no [1m] variant (Claude Code exposes 1M only for opus/sonnet).
 					// 2. Historical model usage from ~/.claude/stats-cache.json
-					const models: string[] = ['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]'];
+					const models: string[] = [...CLAUDE_MODEL_ALIASES];
 					try {
 						const statsPath = path.join(os.homedir(), '.claude', 'stats-cache.json');
 						const statsContent = fs.readFileSync(statsPath, 'utf8');

@@ -2165,7 +2165,7 @@ describe('NewInstanceModal', () => {
 
 			// Should call getModels when expanding
 			await waitFor(() => {
-				expect(window.maestro.agents.getModels).toHaveBeenCalledWith('opencode', false);
+				expect(window.maestro.agents.getModels).toHaveBeenCalledWith('opencode', false, undefined);
 			});
 		});
 
@@ -2755,6 +2755,52 @@ describe('NewInstanceModal', () => {
 			});
 
 			expect((screen.getByLabelText('Agent Name') as HTMLInputElement).value).toBe('My New Agent');
+		});
+
+		it('loads Claude models from the selected SSH host', async () => {
+			vi.mocked(window.maestro.agents.detect).mockResolvedValue([
+				createAgentConfig({
+					capabilities: { supportsModelSelection: true } as AgentConfig['capabilities'],
+				}),
+			]);
+			vi.mocked(window.maestro.agents.getConfig).mockResolvedValue({});
+			vi.mocked(window.maestro.agents.getModels).mockResolvedValue(['opus', 'sonnet', 'haiku']);
+			vi.mocked(window.maestro.sshRemote.getConfigs).mockResolvedValue({
+				success: true,
+				configs: [
+					{
+						id: 'remote-1',
+						name: 'Test Server',
+						host: 'test.example.com',
+						port: 22,
+						enabled: true,
+					},
+				],
+			});
+
+			render(
+				<NewInstanceModal
+					isOpen={true}
+					onClose={onClose}
+					onCreate={onCreate}
+					theme={theme}
+					existingSessions={[]}
+				/>
+			);
+
+			fireEvent.change(await screen.findByRole('combobox'), { target: { value: 'remote-1' } });
+			await waitFor(() => {
+				expect(window.maestro.agents.detect).toHaveBeenCalledWith('remote-1');
+			});
+			fireEvent.click(await screen.findByRole('option', { name: /Claude Code/i }));
+
+			await waitFor(() => {
+				expect(window.maestro.agents.getModels).toHaveBeenCalledWith(
+					'claude-code',
+					false,
+					'remote-1'
+				);
+			});
 		});
 
 		it('should display SSH selector even when no agent is selected', async () => {
