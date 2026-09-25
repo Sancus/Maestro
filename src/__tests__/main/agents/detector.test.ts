@@ -1159,7 +1159,7 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 		});
 
-		it('should discover models for Claude Code from stats-cache.json', async () => {
+		it('offers versioned Claude models and matching local history', async () => {
 			// Setup: claude-code is available
 			mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
 				const binaryName = args[0];
@@ -1175,7 +1175,7 @@ describe('agent-detector', () => {
 			// Mock fs.readFileSync to return stats-cache.json with model usage
 			const statsData = JSON.stringify({
 				modelUsage: {
-					'claude-opus-4-6': { inputTokens: 100 },
+					'claude-opus-5-5-20260922': { inputTokens: 100 },
 					'claude-sonnet-4-6': { inputTokens: 200 },
 				},
 			});
@@ -1190,23 +1190,23 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 
 			const models = await detector.discoverModels('claude-code');
-			// Should include aliases + [1m] variants + historical models
-			expect(models).toContain('fable');
-			expect(models).toContain('sonnet');
-			expect(models).toContain('opus');
-			expect(models).toContain('haiku');
-			expect(models).toContain('opus[1m]');
-			expect(models).toContain('sonnet[1m]');
-			expect(models).toContain('claude-opus-4-6');
-			expect(models).toContain('claude-sonnet-4-6');
+			expect(models).toEqual([
+				'claude-fable-5-1',
+				'claude-fable-5-1[1m]',
+				'claude-opus-5-5',
+				'claude-opus-5-5[1m]',
+				'claude-opus-5',
+				'claude-opus-5[1m]',
+				'claude-opus-5-5-20260922',
+			]);
 			expect(logger.info).toHaveBeenCalledWith(
-				expect.stringContaining('Discovered 8 models'),
+				expect.stringContaining('Discovered 7 models'),
 				'AgentDetector',
 				expect.any(Object)
 			);
 		});
 
-		it('should return aliases when Claude stats-cache.json is missing', async () => {
+		it('returns versioned choices when Claude stats-cache.json is missing', async () => {
 			mockExecFileNoThrow.mockImplementation(async (cmd, args) => {
 				const binaryName = args[0];
 				if (binaryName === 'claude') {
@@ -1226,7 +1226,14 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 
 			const models = await detector.discoverModels('claude-code');
-			expect(models).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
+			expect(models).toEqual([
+				'claude-fable-5-1',
+				'claude-fable-5-1[1m]',
+				'claude-opus-5-5',
+				'claude-opus-5-5[1m]',
+				'claude-opus-5',
+				'claude-opus-5[1m]',
+			]);
 		});
 
 		it('should discover models for Codex from models_cache.json', async () => {
@@ -2029,14 +2036,14 @@ describe('agent-detector', () => {
 					{
 						slug: 'gpt-5.4',
 						visibility: 'list',
-							supported_reasoning_levels: [
-								{ effort: 'low' },
-								{ effort: 'medium' },
-								{ effort: 'high' },
-								{ effort: 'xhigh' },
-								{ effort: 'max' },
-								{ effort: 'ultra' },
-							],
+						supported_reasoning_levels: [
+							{ effort: 'low' },
+							{ effort: 'medium' },
+							{ effort: 'high' },
+							{ effort: 'xhigh' },
+							{ effort: 'max' },
+							{ effort: 'ultra' },
+						],
 					},
 					{
 						slug: 'gpt-5.1-codex-mini',
@@ -2066,16 +2073,7 @@ describe('agent-detector', () => {
 
 			const options = await detector.discoverConfigOptions('codex', 'reasoningEffort');
 			// Should include union of visible models' reasoning levels, sorted by severity
-			expect(options).toEqual([
-				'',
-				'minimal',
-				'low',
-				'medium',
-				'high',
-				'xhigh',
-				'max',
-				'ultra',
-			]);
+			expect(options).toEqual(['', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 			// Hidden model's levels should not be excluded (they share the same platform levels)
 		});
 
@@ -2100,16 +2098,7 @@ describe('agent-detector', () => {
 			await detector.detectAgents();
 
 			const options = await detector.discoverConfigOptions('codex', 'reasoningEffort');
-			expect(options).toEqual([
-				'',
-				'minimal',
-				'low',
-				'medium',
-				'high',
-				'xhigh',
-				'max',
-				'ultra',
-			]);
+			expect(options).toEqual(['', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
 			expect(logger.debug).toHaveBeenCalledWith(
 				'Could not read Codex models_cache.json for config option discovery',
 				'AgentDetector'

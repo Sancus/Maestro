@@ -1385,7 +1385,7 @@ describe('agents IPC handlers', () => {
 				});
 			});
 
-			it('uses Claude aliases and remote model history without invoking claude models', async () => {
+			it('uses versioned Claude models and matching remote history', async () => {
 				mockSettingsStore.get.mockReturnValue([
 					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
 				]);
@@ -1395,7 +1395,9 @@ describe('agents IPC handlers', () => {
 				});
 				vi.mocked(execFileNoThrow).mockResolvedValue({
 					exitCode: 0,
-					stdout: JSON.stringify({ modelUsage: { 'claude-opus-5-5': {}, 'claude-sonnet-5': {} } }),
+					stdout: JSON.stringify({
+						modelUsage: { 'claude-opus-5-5-20260922': {}, 'claude-sonnet-5': {} },
+					}),
 					stderr: '',
 				});
 
@@ -1413,18 +1415,17 @@ describe('agents IPC handlers', () => {
 					})
 				);
 				expect(result).toEqual([
-					'fable',
-					'sonnet',
-					'opus',
-					'haiku',
-					'opus[1m]',
-					'sonnet[1m]',
+					'claude-fable-5-1',
+					'claude-fable-5-1[1m]',
 					'claude-opus-5-5',
-					'claude-sonnet-5',
+					'claude-opus-5-5[1m]',
+					'claude-opus-5',
+					'claude-opus-5[1m]',
+					'claude-opus-5-5-20260922',
 				]);
 			});
 
-			it('offers Claude aliases when the remote has no model history', async () => {
+			it('offers versioned Claude models when the remote has no model history', async () => {
 				mockSettingsStore.get.mockReturnValue([
 					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
 				]);
@@ -1434,10 +1435,17 @@ describe('agents IPC handlers', () => {
 				const handler = handlers.get('agents:getModels');
 				const result = await handler!({} as any, 'claude-code', true, 'remote-claude');
 
-				expect(result).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
+				expect(result).toEqual([
+					'claude-fable-5-1',
+					'claude-fable-5-1[1m]',
+					'claude-opus-5-5',
+					'claude-opus-5-5[1m]',
+					'claude-opus-5',
+					'claude-opus-5[1m]',
+				]);
 			});
 
-			it('falls back to Claude aliases when SSH model discovery fails', async () => {
+			it('falls back to versioned Claude models when SSH discovery fails', async () => {
 				mockSettingsStore.get.mockReturnValue([
 					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
 				]);
@@ -1451,7 +1459,14 @@ describe('agents IPC handlers', () => {
 				const handler = handlers.get('agents:getModels');
 				const result = await handler!({} as any, 'claude-code', true, 'remote-claude');
 
-				expect(result).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
+				expect(result).toEqual([
+					'claude-fable-5-1',
+					'claude-fable-5-1[1m]',
+					'claude-opus-5-5',
+					'claude-opus-5-5[1m]',
+					'claude-opus-5',
+					'claude-opus-5[1m]',
+				]);
 			});
 
 			it('should discover models on SSH remote when sshRemoteId is provided', async () => {

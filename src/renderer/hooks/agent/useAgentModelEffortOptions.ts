@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { readEffortFromConfig } from '../../utils/agentEffort';
-import { CLAUDE_MODEL_ALIASES } from '../../../shared/agentConstants';
+import { CLAUDE_MODEL_CHOICES } from '../../../shared/agentConstants';
 
 export interface AgentModelEffortOptions {
 	/** Model ids the agent offers. Empty when the agent has no model selection. */
@@ -67,11 +67,11 @@ export function useAgentModelEffortOptions(
 			.then((fetched) => {
 				if (!stale)
 					setModels(
-						agentId === 'claude-code' && fetched.length === 0 ? [...CLAUDE_MODEL_ALIASES] : fetched
+						agentId === 'claude-code' && fetched.length === 0 ? [...CLAUDE_MODEL_CHOICES] : fetched
 					);
 			})
 			.catch(() => {
-				if (!stale) setModels(agentId === 'claude-code' ? [...CLAUDE_MODEL_ALIASES] : []);
+				if (!stale) setModels(agentId === 'claude-code' ? [...CLAUDE_MODEL_CHOICES] : []);
 			});
 
 		const effortsDone = Promise.all([
