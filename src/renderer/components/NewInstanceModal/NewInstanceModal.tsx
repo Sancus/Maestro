@@ -76,6 +76,8 @@ export function NewInstanceModal({
 	const [agentConfigs, setAgentConfigs] = useState<Record<string, Record<string, any>>>({});
 	const [availableModels, setAvailableModels] = useState<Record<string, string[]>>({});
 	const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+	const modelSourcesRef = useRef<Record<string, string>>({});
+	const modelRequestIdsRef = useRef<Record<string, number>>({});
 	const [dynamicOptions, setDynamicOptions] = useState<Record<string, Record<string, string[]>>>(
 		{}
 	);
@@ -464,25 +466,44 @@ export function NewInstanceModal({
 
 	// Load available models for an agent that supports model selection
 	const loadModelsForAgent = React.useCallback(
-		async (agentId: string, forceRefresh = false) => {
+		async (agentId: string, forceRefresh = false, remoteIdOverride?: string | null) => {
 			// Check if agent supports model selection
 			const agent = agents.find((a) => a.id === agentId);
 			if (!agent?.capabilities?.supportsModelSelection) return;
+			const sshConfig = agentSshRemoteConfigs[agentId] || agentSshRemoteConfigs['_pending_'];
+			const sshRemoteId =
+				remoteIdOverride !== undefined
+					? remoteIdOverride
+					: sshConfig?.enabled
+						? sshConfig.remoteId
+						: null;
+			const source = sshRemoteId ?? 'local';
 
-			// Skip if already loaded and not forcing refresh
-			if (!forceRefresh && availableModels[agentId]?.length > 0) return;
+			// A model list from the local host or another SSH host is not reusable.
+			if (!forceRefresh && modelSourcesRef.current[agentId] === source) return;
+			const requestId = (modelRequestIdsRef.current[agentId] ?? 0) + 1;
+			modelRequestIdsRef.current[agentId] = requestId;
 
 			setLoadingModels((prev) => ({ ...prev, [agentId]: true }));
 			try {
-				const models = await window.maestro.agents.getModels(agentId, forceRefresh);
-				setAvailableModels((prev) => ({ ...prev, [agentId]: models }));
+				const models = await window.maestro.agents.getModels(
+					agentId,
+					forceRefresh,
+					sshRemoteId ?? undefined
+				);
+				if (modelRequestIdsRef.current[agentId] === requestId) {
+					modelSourcesRef.current[agentId] = source;
+					setAvailableModels((prev) => ({ ...prev, [agentId]: models }));
+				}
 			} catch (error) {
 				logger.error(`Failed to load models for ${agentId}:`, undefined, error);
 			} finally {
-				setLoadingModels((prev) => ({ ...prev, [agentId]: false }));
+				if (modelRequestIdsRef.current[agentId] === requestId) {
+					setLoadingModels((prev) => ({ ...prev, [agentId]: false }));
+				}
 			}
 		},
-		[agents, availableModels]
+		[agents, agentSshRemoteConfigs]
 	);
 
 	// Load dynamic config options for an agent (e.g., effort levels, reasoning levels)
@@ -1251,6 +1272,10 @@ export function NewInstanceModal({
 							}
 							return newConfigs;
 						});
+						if (selectedAgent && expandedAgent === selectedAgent) {
+							setAvailableModels((prev) => ({ ...prev, [selectedAgent]: [] }));
+							void loadModelsForAgent(selectedAgent, true, config.enabled ? config.remoteId : null);
+						}
 					}}
 				/>
 

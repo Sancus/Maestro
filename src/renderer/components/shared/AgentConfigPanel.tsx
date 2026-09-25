@@ -159,7 +159,8 @@ function ModelTextInput({
 						}}
 						onFocus={() => {
 							if (isModelField && hasModels) {
-								setFilterText(value);
+								setFilterText('');
+								setIsFiltering(false);
 								setShowDropdown(true);
 							}
 						}}
@@ -199,8 +200,11 @@ function ModelTextInput({
 					{isModelField && hasModels && (
 						<button
 							type="button"
+							aria-label="Show models"
 							onClick={(e) => {
 								e.stopPropagation();
+								setFilterText('');
+								setIsFiltering(false);
 								setShowDropdown(!showDropdown);
 								inputRef.current?.focus();
 							}}

@@ -62,7 +62,7 @@ import {
 import type { CodexResetCreditConsumeResult } from '../../../shared/codexResetCredits';
 import type { KnownAuthDirs } from '../../../shared/authPaths';
 import { rememberableEnvVarKeys, type KnownEnvVarKeys } from '../../../shared/envVarCatalog';
-import { mergeCodexModels } from '../../../shared/agentConstants';
+import { CLAUDE_MODEL_ALIASES, mergeCodexModels } from '../../../shared/agentConstants';
 import { readCodexConfig } from '../../parsers/codex-output-parser';
 
 const LOG_CONTEXT = '[AgentDetector]';
@@ -750,9 +750,9 @@ async function discoverModelsFromRemoteConfigs(sshRemote: SshRemoteConfig): Prom
 
 /**
  * Discover available models for an agent on a remote SSH host.
- * Uses the agent's `models` subcommand over SSH, except Codex, whose model
- * catalog is read from its remote models_cache.json. OpenCode is supplemented
- * by models from remote opencode.json config files.
+ * Uses the agent's `models` subcommand over SSH, except Claude and Codex,
+ * whose catalogs are read from remote config files and merged with aliases.
+ * OpenCode is supplemented by models from remote opencode.json config files.
  * Returns an empty array on timeout, non-zero exit, or unknown agent.
  * Throws on unexpected errors (e.g., SSH config issues, parsing bugs).
  */
@@ -779,18 +779,29 @@ async function discoverModelsRemote(
 		return [];
 	}
 
-	const remoteOptions: RemoteCommandOptions =
-		agentId === 'codex'
-			? {
-					command: 'sh',
-					args: ['-c', 'cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null || true'],
-					env: sshRemote.remoteEnv,
-				}
-			: {
-					command: agentDef.binaryName,
-					args: agentId === 'omp' ? ['models', '--json'] : ['models'],
-					env: sshRemote.remoteEnv,
-				};
+	let remoteOptions: RemoteCommandOptions;
+	if (agentId === 'claude-code') {
+		remoteOptions = {
+			command: 'sh',
+			args: [
+				'-c',
+				'cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/stats-cache.json" 2>/dev/null || true',
+			],
+			env: sshRemote.remoteEnv,
+		};
+	} else if (agentId === 'codex') {
+		remoteOptions = {
+			command: 'sh',
+			args: ['-c', 'cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json" 2>/dev/null || true'],
+			env: sshRemote.remoteEnv,
+		};
+	} else {
+		remoteOptions = {
+			command: agentDef.binaryName,
+			args: agentId === 'omp' ? ['models', '--json'] : ['models'],
+			env: sshRemote.remoteEnv,
+		};
+	}
 
 	try {
 		const sshCommand = await buildSshCommand(sshRemote, remoteOptions);
@@ -828,7 +839,21 @@ async function discoverModelsRemote(
 		const models: string[] = [];
 		const sanitizedStdout = stripAnsi(result.stdout);
 
-		if (agentId === 'codex') {
+		if (agentId === 'claude-code') {
+			models.push(...CLAUDE_MODEL_ALIASES);
+			for (const model of models) seen.add(model);
+			try {
+				const stats = parseJsonWithBom<{ modelUsage?: Record<string, unknown> }>(sanitizedStdout);
+				for (const model of Object.keys(stats.modelUsage ?? {})) {
+					if (!seen.has(model)) {
+						seen.add(model);
+						models.push(model);
+					}
+				}
+			} catch {
+				// A fresh remote Claude install may not have written stats yet.
+			}
+		} else if (agentId === 'codex') {
 			try {
 				const cache = parseJsonWithBom<{
 					models?: Array<{ slug?: string; visibility?: string }>;

@@ -1385,6 +1385,58 @@ describe('agents IPC handlers', () => {
 				});
 			});
 
+			it('uses Claude aliases and remote model history without invoking claude models', async () => {
+				mockSettingsStore.get.mockReturnValue([
+					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
+				]);
+				vi.mocked(buildSshCommand).mockResolvedValue({
+					command: 'ssh',
+					args: ['dev@dev.example.com', 'read claude stats'],
+				});
+				vi.mocked(execFileNoThrow).mockResolvedValue({
+					exitCode: 0,
+					stdout: JSON.stringify({ modelUsage: { 'claude-opus-5-5': {}, 'claude-sonnet-5': {} } }),
+					stderr: '',
+				});
+
+				const handler = handlers.get('agents:getModels');
+				const result = await handler!({} as any, 'claude-code', false, 'remote-claude');
+
+				expect(buildSshCommand).toHaveBeenCalledWith(
+					expect.objectContaining({ id: 'remote-claude' }),
+					expect.objectContaining({
+						command: 'sh',
+						args: [
+							'-c',
+							'cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/stats-cache.json" 2>/dev/null || true',
+						],
+					})
+				);
+				expect(result).toEqual([
+					'fable',
+					'sonnet',
+					'opus',
+					'haiku',
+					'opus[1m]',
+					'sonnet[1m]',
+					'claude-opus-5-5',
+					'claude-sonnet-5',
+				]);
+			});
+
+			it('offers Claude aliases when the remote has no model history', async () => {
+				mockSettingsStore.get.mockReturnValue([
+					{ id: 'remote-claude', host: 'dev.example.com', user: 'dev', enabled: true },
+				]);
+				vi.mocked(buildSshCommand).mockResolvedValue({ command: 'ssh', args: [] });
+				vi.mocked(execFileNoThrow).mockResolvedValue({ exitCode: 0, stdout: '', stderr: '' });
+
+				const handler = handlers.get('agents:getModels');
+				const result = await handler!({} as any, 'claude-code', true, 'remote-claude');
+
+				expect(result).toEqual(['fable', 'sonnet', 'opus', 'haiku', 'opus[1m]', 'sonnet[1m]']);
+			});
+
 			it('should discover models on SSH remote when sshRemoteId is provided', async () => {
 				mockSettingsStore.get.mockReturnValue([
 					{
