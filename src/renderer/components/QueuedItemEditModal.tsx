@@ -17,6 +17,7 @@ import { LightboxModal } from './LightboxModal';
 import { ModelEffortPills } from './InputArea/components/ModelEffortPills';
 import { useModelEffortMenus } from './InputArea/hooks/useModelEffortMenus';
 import { useAgentModelEffortOptions } from '../hooks/agent/useAgentModelEffortOptions';
+import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 import { effortsForModel } from '../../shared/agentConstants';
 import { codifyTurnSettings } from '../utils/providerTabSessions';
 
@@ -69,7 +70,10 @@ export function QueuedItemEditModal({
 
 	// Options come from the agent's own provider, never a hardcoded list: Claude
 	// Code's thinking levels and Codex's reasoning efforts are different sets.
-	const providerOptions = useAgentModelEffortOptions(session?.toolType);
+	const providerOptions = useAgentModelEffortOptions(
+		session?.toolType,
+		getSessionSshRemoteId(session)
+	);
 	const menus = useModelEffortMenus();
 	// Currently-viewed image in the local carousel; null when the carousel is closed.
 	const [lightboxImage, setLightboxImage] = useState<string | null>(null);

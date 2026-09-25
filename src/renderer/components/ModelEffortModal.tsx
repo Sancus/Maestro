@@ -61,6 +61,7 @@ import { readableTextOn } from '../../shared/colorContrast';
 import { getAgentDisplayName } from '../../shared/agentMetadata';
 import { effortsForModel } from '../../shared/agentConstants';
 import { getTabDisplayName } from '../utils/tabHelpers';
+import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 import { selectActiveSession, useSessionStore } from '../stores/sessionStore';
 import { useTabStore } from '../stores/tabStore';
 
@@ -155,8 +156,10 @@ export function ModelEffortModal({ theme, tabId, onClose }: ModelEffortModalProp
 	const tab = activeSession?.aiTabs.find((t) => t.id === tabId);
 	const agentId = activeSession?.toolType;
 
-	const { models, efforts, defaultModel, defaultEffort, loaded } =
-		useAgentModelEffortOptions(agentId);
+	const { models, efforts, defaultModel, defaultEffort, loaded } = useAgentModelEffortOptions(
+		agentId,
+		getSessionSshRemoteId(activeSession)
+	);
 	const { model: currentModel, effort: currentEffort } = resolveModelEffort(tab, activeSession, {
 		defaultModel,
 		defaultEffort,

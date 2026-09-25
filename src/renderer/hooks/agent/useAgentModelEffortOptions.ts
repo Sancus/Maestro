@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { readEffortFromConfig } from '../../utils/agentEffort';
+import { CLAUDE_MODEL_ALIASES } from '../../../shared/agentConstants';
 
 export interface AgentModelEffortOptions {
 	/** Model ids the agent offers. Empty when the agent has no model selection. */
@@ -46,7 +47,10 @@ export interface AgentModelEffortOptions {
  *
  * @param agentId - The agent's tool type, or undefined when no agent is active.
  */
-export function useAgentModelEffortOptions(agentId?: string): AgentModelEffortOptions {
+export function useAgentModelEffortOptions(
+	agentId?: string,
+	sshRemoteId?: string
+): AgentModelEffortOptions {
 	const [models, setModels] = useState<string[]>([]);
 	const [efforts, setEfforts] = useState<string[]>([]);
 	const [defaultModel, setDefaultModel] = useState('');
@@ -59,12 +63,15 @@ export function useAgentModelEffortOptions(agentId?: string): AgentModelEffortOp
 		setLoaded(false);
 
 		const modelsDone = window.maestro.agents
-			.getModels(agentId)
+			.getModels(agentId, false, sshRemoteId)
 			.then((fetched) => {
-				if (!stale) setModels(fetched);
+				if (!stale)
+					setModels(
+						agentId === 'claude-code' && fetched.length === 0 ? [...CLAUDE_MODEL_ALIASES] : fetched
+					);
 			})
 			.catch(() => {
-				if (!stale) setModels([]);
+				if (!stale) setModels(agentId === 'claude-code' ? [...CLAUDE_MODEL_ALIASES] : []);
 			});
 
 		const effortsDone = Promise.all([
@@ -101,7 +108,7 @@ export function useAgentModelEffortOptions(agentId?: string): AgentModelEffortOp
 		return () => {
 			stale = true;
 		};
-	}, [agentId]);
+	}, [agentId, sshRemoteId]);
 
 	const visibleModels =
 		defaultModel && !models.includes(defaultModel) ? [defaultModel, ...models] : models;

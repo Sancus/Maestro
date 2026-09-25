@@ -375,7 +375,7 @@ describe('useAgentConfiguration', () => {
 				await result.current.refreshModels();
 			});
 
-			expect(mockGetModels).toHaveBeenCalledWith('claude-code', true);
+			expect(mockGetModels).toHaveBeenCalledWith('claude-code', true, undefined);
 			expect(result.current.availableModels).toEqual(['opus', 'sonnet', 'haiku']);
 		});
 
@@ -543,9 +543,33 @@ describe('useAgentConfiguration', () => {
 			});
 
 			expect(mockGetConfig).toHaveBeenCalledWith('claude-code');
-			expect(mockGetModels).toHaveBeenCalledWith('claude-code');
+			expect(mockGetModels).toHaveBeenCalledWith('claude-code', false, undefined);
 			expect(result.current.agentConfig).toEqual({ model: 'opus' });
 			expect(result.current.availableModels).toEqual(['opus', 'sonnet']);
+		});
+
+		it('loads and refreshes models for a remote moderator', async () => {
+			mockDetect.mockResolvedValue([
+				makeAgent({
+					id: 'claude-code',
+					capabilities: { supportsModelSelection: true } as any,
+				}),
+			]);
+			const { result } = renderHook(() =>
+				useAgentConfiguration({ enabled: true, autoSelect: true })
+			);
+			await waitFor(() => expect(result.current.isDetecting).toBe(false));
+			act(() => {
+				result.current.setSshRemoteConfig({ enabled: true, remoteId: 'remote-1' });
+			});
+
+			await act(async () => {
+				await result.current.loadAgentConfig('claude-code');
+				await result.current.refreshModels();
+			});
+
+			expect(mockGetModels).toHaveBeenCalledWith('claude-code', false, 'remote-1');
+			expect(mockGetModels).toHaveBeenCalledWith('claude-code', true, 'remote-1');
 		});
 
 		it('loads config but not models for agent without model selection', async () => {

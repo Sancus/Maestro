@@ -88,6 +88,34 @@ describe('ModelEffortModal', () => {
 		expect(onClose).toHaveBeenCalled();
 	});
 
+	it('loads the model wheel from the session SSH host', async () => {
+		const session = seedStore();
+		useSessionStore.setState({
+			sessions: [
+				{
+					...session,
+					sshRemoteId: 'remote-1',
+				},
+			],
+		});
+		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockResolvedValue([
+			'claude-sonnet-remote',
+			'claude-opus-remote',
+		]);
+
+		renderModal();
+		await screen.findByText('claude-sonnet-remote');
+		expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code', false, 'remote-1');
+	});
+
+	it('offers Claude aliases if model discovery returns no choices', async () => {
+		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+		renderModal();
+		await screen.findByText('sonnet');
+		expect(screen.getByText('opus')).toBeInTheDocument();
+	});
+
 	it('moves the model with Up/Down and the effort with Left/Right, committing both on Enter', async () => {
 		renderModal();
 		await screen.findByText('claude-sonnet-4.5');
@@ -208,6 +236,7 @@ describe('ModelEffortModal', () => {
 	});
 
 	it('says so when the agent exposes neither knob, but not before the lookups settle', async () => {
+		seedStore({}, 'opencode');
 		let releaseModels: (models: string[]) => void = () => {};
 		(window.maestro.agents.getModels as ReturnType<typeof vi.fn>).mockReturnValue(
 			new Promise<string[]>((resolve) => {
