@@ -168,11 +168,11 @@ describe('estimateContextUsage', () => {
 			expect(result).toBe(5);
 		});
 
-		it('should use codex default context window (200k) and include output tokens', () => {
+		it('should use codex default context window (272k) and include output tokens', () => {
 			const stats = createStats({ contextWindow: 0 });
 			const result = estimateContextUsage(stats, 'codex');
-			// Codex includes output tokens: (10000 + 5000 + 0) / 200000 = 7.5% -> 8%
-			expect(result).toBe(8);
+			// Codex includes output tokens: (10000 + 5000 + 0) / 272000 = 5.5% -> 6%
+			expect(result).toBe(6);
 		});
 
 		it('should use opencode default context window (128k)', () => {
@@ -285,7 +285,7 @@ describe('DEFAULT_CONTEXT_WINDOWS', () => {
 		// Only ToolType values have context windows defined
 		// 'claude' was consolidated to 'claude-code', and 'aider' is not a ToolType
 		expect(DEFAULT_CONTEXT_WINDOWS['claude-code']).toBe(200000);
-		expect(DEFAULT_CONTEXT_WINDOWS['codex']).toBe(200000);
+		expect(DEFAULT_CONTEXT_WINDOWS['codex']).toBe(272000);
 		expect(DEFAULT_CONTEXT_WINDOWS['opencode']).toBe(128000);
 		expect(DEFAULT_CONTEXT_WINDOWS['factory-droid']).toBe(200000);
 		expect(DEFAULT_CONTEXT_WINDOWS['terminal']).toBe(0);
