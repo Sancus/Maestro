@@ -510,7 +510,7 @@ describe('EncoreTab', () => {
 				await vi.advanceTimersByTimeAsync(100);
 			});
 
-			expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code');
+			expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code', false, undefined);
 			expect(screen.getByTestId('agent-config-available-models')).toHaveTextContent(
 				JSON.stringify(['claude-3-opus', 'claude-3-sonnet'])
 			);
@@ -549,7 +549,7 @@ describe('EncoreTab', () => {
 				await vi.advanceTimersByTimeAsync(100);
 			});
 
-			expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code', true);
+			expect(window.maestro.agents.getModels).toHaveBeenCalledWith('claude-code', true, undefined);
 		});
 	});
 
