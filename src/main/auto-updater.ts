@@ -8,11 +8,11 @@
  */
 
 import type { UpdateInfo, ProgressInfo, AppUpdater } from 'electron-updater';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { logger } from './utils/logger';
 import { captureException } from './utils/sentry';
 import { isWebContentsAvailable } from './utils/safe-send';
-import { getReleaseDownloadFeedUrl } from './update-checker';
+import { getReleaseDownloadFeedUrl, isCustomBuildVersion } from './update-checker';
 
 export interface UpdateStatus {
 	status:
@@ -126,11 +126,11 @@ function getAutoUpdater(): AppUpdater {
 		_autoUpdater = autoUpdater;
 		// Configure defaults
 		_autoUpdater!.autoDownload = false;
-		_autoUpdater!.autoInstallOnAppQuit = true;
+		_autoUpdater!.autoInstallOnAppQuit = !isCustomBuildVersion(app.getVersion());
 		_autoUpdater!.allowPrerelease = false;
 		logger.info('electron-updater initialized', 'AutoUpdater', {
 			autoDownload: false,
-			autoInstallOnAppQuit: true,
+			autoInstallOnAppQuit: _autoUpdater!.autoInstallOnAppQuit,
 			allowPrerelease: false,
 		});
 	}
@@ -172,6 +172,7 @@ export function initAutoUpdater(window: BrowserWindow, options?: InitAutoUpdater
 	onBeforeQuitAndInstall = options?.onBeforeQuitAndInstall ?? null;
 
 	const autoUpdater = getAutoUpdater();
+	if (isCustomBuildVersion(app.getVersion())) autoUpdater.autoInstallOnAppQuit = false;
 
 	// Update available
 	autoUpdater.on('update-available', (info: UpdateInfo) => {
@@ -233,6 +234,15 @@ function setupIpcHandlers(): void {
 		return;
 	}
 	ipcHandlersRegistered = true;
+	if (isCustomBuildVersion(app.getVersion())) {
+		const error =
+			'Official updates are disabled for this custom build. Install a newer custom build to update.';
+		for (const channel of ['updates:checkAutoUpdater', 'updates:download', 'updates:install']) {
+			ipcMain.handle(channel, () => ({ success: false, error }));
+		}
+		ipcMain.handle('updates:getStatus', () => ({ status: 'not-available' }));
+		return;
+	}
 
 	const autoUpdater = getAutoUpdater();
 
@@ -367,6 +377,7 @@ function setupIpcHandlers(): void {
  * Manually trigger update check (can be called from main process)
  */
 export async function checkForUpdatesManual(): Promise<UpdateInfo | null> {
+	if (isCustomBuildVersion(app.getVersion())) return null;
 	try {
 		const autoUpdater = getAutoUpdater();
 		logger.info(

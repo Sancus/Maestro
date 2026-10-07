@@ -5062,29 +5062,32 @@ branch refs/heads/bugfix-123
 			]);
 
 			const remoteFs = await import('../../../../main/utils/remote-fs');
-			vi.mocked(remoteFs.readDirRemote).mockImplementation(async (dir) => ({
-				success: true,
-				data:
-					String(dir) === '/remote/worktrees'
-						? [{ name: 'feature', isDirectory: true }]
-						: [],
-			}) as any);
+			vi.mocked(remoteFs.readDirRemote).mockImplementation(
+				async (dir) =>
+					({
+						success: true,
+						data:
+							String(dir) === '/remote/worktrees' ? [{ name: 'feature', isDirectory: true }] : [],
+					}) as any
+			);
 
 			const remoteGit = await import('../../../../main/utils/remote-git');
-			vi.mocked(remoteGit.execGit).mockImplementation(async (args, _localCwd, _sshRemote, remoteCwd) => {
-				if (remoteCwd !== remotePath) {
-					return { stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 };
+			vi.mocked(remoteGit.execGit).mockImplementation(
+				async (args, _localCwd, _sshRemote, remoteCwd) => {
+					if (remoteCwd !== remotePath) {
+						return { stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 };
+					}
+					if (args.includes('--is-inside-work-tree'))
+						return { stdout: 'true\n', stderr: '', exitCode: 0 };
+					if (args.includes('--show-toplevel'))
+						return { stdout: `${remotePath}\n`, stderr: '', exitCode: 0 };
+					if (args.includes('--git-dir'))
+						return { stdout: '/remote/repo/.git/worktrees/feature\n', stderr: '', exitCode: 0 };
+					if (args.includes('--git-common-dir'))
+						return { stdout: '/remote/repo/.git\n', stderr: '', exitCode: 0 };
+					return { stdout: 'feature\n', stderr: '', exitCode: 0 };
 				}
-				if (args.includes('--is-inside-work-tree'))
-					return { stdout: 'true\n', stderr: '', exitCode: 0 };
-				if (args.includes('--show-toplevel'))
-					return { stdout: `${remotePath}\n`, stderr: '', exitCode: 0 };
-				if (args.includes('--git-dir'))
-					return { stdout: '/remote/repo/.git/worktrees/feature\n', stderr: '', exitCode: 0 };
-				if (args.includes('--git-common-dir'))
-					return { stdout: '/remote/repo/.git\n', stderr: '', exitCode: 0 };
-				return { stdout: 'feature\n', stderr: '', exitCode: 0 };
-			});
+			);
 
 			const handler = handlers.get('git:scanWorktreeDirectory');
 			const result = await handler!({} as any, '/remote/worktrees', 'ssh-1');
@@ -5109,10 +5112,14 @@ branch refs/heads/bugfix-123
 				{ id: 'ssh-1', host: 'remote.example.com', user: 'me' },
 			]);
 			const remoteFs = await import('../../../../main/utils/remote-fs');
-			vi.mocked(remoteFs.readDirRemote).mockImplementation(async (dir) => ({
-				success: true,
-				data: String(dir) === '/remote/worktrees' ? [{ name: 'feature', isDirectory: true }] : [],
-			}) as any);
+			vi.mocked(remoteFs.readDirRemote).mockImplementation(
+				async (dir) =>
+					({
+						success: true,
+						data:
+							String(dir) === '/remote/worktrees' ? [{ name: 'feature', isDirectory: true }] : [],
+					}) as any
+			);
 			const remoteGit = await import('../../../../main/utils/remote-git');
 			vi.mocked(remoteGit.execGit).mockImplementation(async (args) => {
 				if (args.includes('--is-inside-work-tree'))

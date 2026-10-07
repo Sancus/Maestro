@@ -46,6 +46,10 @@ vi.mock('lucide-react', () => {
 		CheckSquare: createIcon('check-square', '✅'),
 		ListChecks: createIcon('list-checks', '📝'),
 		Target: createIcon('target', '🎯'),
+		// WizardStats icons
+		Wand2: createIcon('wand', 'W'),
+		FileText: createIcon('file-text', 'F'),
+		MessagesSquare: createIcon('messages-square', 'M'),
 		// SummaryCards - Open Tabs
 		PanelTop: createIcon('panel-top', '🔲'),
 		// LongestAutoRunsTable + SummaryCards (Best Day) icons
@@ -124,6 +128,7 @@ const mockMaestro = {
 		onStatsUpdate: mockOnStatsUpdate,
 		getAutoRunSessions: mockGetAutoRunSessions,
 		getAutoRunTasks: mockGetAutoRunTasks,
+		getWizardRuns: vi.fn().mockResolvedValue([]),
 		getDatabaseSize: mockGetDatabaseSize,
 		getShortcutUsageByDay: mockGetShortcutUsageByDay,
 		getShortcutUsageTotal: mockGetShortcutUsageTotal,

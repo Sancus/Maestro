@@ -12,6 +12,11 @@ const GITHUB_OWNER = 'RunMaestro';
 const GITHUB_REPO = 'Maestro';
 const RELEASES_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
 
+/** Custom packages must not replace their own code with an upstream release. */
+export function isCustomBuildVersion(version: string): boolean {
+	return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-(?:local|sancus)(?:\.|$)/.test(version);
+}
+
 /** Request budget for the GitHub releases poll. */
 const RELEASES_FETCH_TIMEOUT_MS = 15_000;
 
@@ -189,6 +194,19 @@ export async function checkForUpdates(
 	includePrerelease: boolean = false
 ): Promise<UpdateCheckResult> {
 	const releasesUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`;
+	if (isCustomBuildVersion(currentVersion)) {
+		return {
+			currentVersion,
+			latestVersion: currentVersion,
+			updateAvailable: false,
+			versionsBehind: 0,
+			releases: [],
+			releasesUrl,
+			assetsReady: false,
+			error:
+				'Official updates are disabled for this custom build. Install a newer custom build to update.',
+		};
+	}
 
 	logger.info(
 		`Checking for updates (current: ${currentVersion}, includePrerelease: ${includePrerelease}, platform: ${process.platform})`,

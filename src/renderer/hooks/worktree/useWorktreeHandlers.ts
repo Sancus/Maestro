@@ -331,7 +331,11 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 		// Scan for worktrees and create sub-agent sessions
 		const parentSshRemoteId = getSshRemoteId(activeSession);
 		try {
-			const scanResult = await scanConfiguredWorktrees(activeSession, config.basePath, parentSshRemoteId);
+			const scanResult = await scanConfiguredWorktrees(
+				activeSession,
+				config.basePath,
+				parentSshRemoteId
+			);
 			const { gitSubdirs } = scanResult;
 
 			if (gitSubdirs.length > 0) {
@@ -675,7 +679,7 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 				parentSession: createWtSession,
 				path: actualPath,
 				branch: branchName,
-					name: worktreeFolderName(actualPath),
+				name: worktreeFolderName(actualPath),
 				defaultSaveToHistory: savToHist,
 				defaultShowThinking: showThink,
 				...gitInfo,
@@ -879,10 +883,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 							s.worktreeBranch === subdir.branch
 						);
 					});
-						if (existingSession) {
-							restoreWorktreeFolderName(existingSession, subdir.path, subdir.branch);
-							continue;
-						}
+					if (existingSession) {
+						restoreWorktreeFolderName(existingSession, subdir.path, subdir.branch);
+						continue;
+					}
 
 					if (
 						newWorktreeSessions.some(

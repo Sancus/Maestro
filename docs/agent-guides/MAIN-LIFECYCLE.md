@@ -380,6 +380,8 @@ Defined in `src/main/auto-updater.ts`.
 
 Uses `electron-updater` with lazy initialization (deferred `require()`) to avoid module-load-time access to `electron.app`.
 
+Custom packages with `-local.` or `-sancus.` in the version retain their bundled code. `isCustomBuildVersion()` in `src/main/update-checker.ts` disables official release checks for these packages. The auto-updater also blocks download and install IPC and install-on-quit for them. This applies to RC-prefixed versions such as `0.18.9-RC-sancus.22.1`.
+
 ### Configuration
 
 ```typescript

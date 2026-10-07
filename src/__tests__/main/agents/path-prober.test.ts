@@ -402,7 +402,10 @@ describe('path-prober', () => {
 				const filename = String(file);
 				if (filename.includes('incomplete-hash'))
 					throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-				return { isFile: () => true, birthtimeMs: filename.includes('new-hash') ? 20 : 10 } as fs.Stats;
+				return {
+					isFile: () => true,
+					birthtimeMs: filename.includes('new-hash') ? 20 : 10,
+				} as fs.Stats;
 			});
 			accessMock.mockImplementation(async (file) => {
 				if (!String(file).includes('-hash')) throw new Error('ENOENT');

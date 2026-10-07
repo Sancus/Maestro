@@ -10,7 +10,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Import after mocking
-import { checkForUpdates } from '../../main/update-checker';
+import { checkForUpdates, isCustomBuildVersion } from '../../main/update-checker';
 
 // Helper to create mock release
 const createMockRelease = (
@@ -43,7 +43,27 @@ describe('update-checker', () => {
 		vi.restoreAllMocks();
 	});
 
+	it.each([
+		['0.18.9-local.abc12345', true],
+		['0.18.9-RC-local.abc12345', true],
+		['0.18.9-RC-sancus.22.1', true],
+		['0.18.9-RC', false],
+		['0.18.9', false],
+	])('classifies custom build version %s', (version, expected) => {
+		expect(isCustomBuildVersion(version)).toBe(expected);
+	});
+
 	describe('checkForUpdates', () => {
+		it.each(['0.18.9-RC-local.abc12345', '0.18.9-RC-sancus.22.1'])(
+			'does not offer official releases to custom build %s',
+			async (version) => {
+				const result = await checkForUpdates(version, true);
+				expect(result.updateAvailable).toBe(false);
+				expect(result.error).toContain('disabled for this custom build');
+				expect(mockFetch).not.toHaveBeenCalled();
+			}
+		);
+
 		it('returns update available when newer version exists', async () => {
 			mockFetch.mockResolvedValue({
 				ok: true,

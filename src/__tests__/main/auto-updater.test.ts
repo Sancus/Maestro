@@ -18,6 +18,7 @@ const mockHandle = vi.fn((channel: string, fn: (...args: unknown[]) => unknown) 
 });
 
 vi.mock('electron', () => ({
+	app: { getVersion: () => mockVersion },
 	BrowserWindow: class {},
 	ipcMain: {
 		handle: (channel: string, fn: (...args: unknown[]) => unknown) => mockHandle(channel, fn),
@@ -56,8 +57,11 @@ const mockAutoUpdater = {
 	setFeedURL: vi.fn(),
 };
 
+let mockVersion = '0.18.9-RC';
+
 describe('main/auto-updater', () => {
 	beforeEach(() => {
+		mockVersion = '0.18.9-RC';
 		vi.clearAllMocks();
 		vi.resetModules();
 		ipcHandlers.clear();
@@ -67,6 +71,35 @@ describe('main/auto-updater', () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 	});
+
+	it.each(['0.18.9-RC-local.abc12345', '0.18.9-RC-sancus.22.1'])(
+		'blocks official update operations for custom build %s',
+		async (version) => {
+			mockVersion = version;
+			const { initAutoUpdater, __setAutoUpdaterForTesting, checkForUpdatesManual } =
+				await import('../../main/auto-updater');
+			__setAutoUpdaterForTesting(
+				mockAutoUpdater as unknown as Parameters<typeof __setAutoUpdaterForTesting>[0]
+			);
+			mockAutoUpdater.autoInstallOnAppQuit = true;
+			const beforeInstall = vi.fn();
+			initAutoUpdater({} as Parameters<typeof initAutoUpdater>[0], {
+				onBeforeQuitAndInstall: beforeInstall,
+			});
+			for (const channel of ['updates:checkAutoUpdater', 'updates:download', 'updates:install']) {
+				expect(await ipcHandlers.get(channel)!()).toEqual({
+					success: false,
+					error: expect.stringContaining('disabled for this custom build'),
+				});
+			}
+			expect(await checkForUpdatesManual()).toBeNull();
+			expect(mockAutoUpdater.autoInstallOnAppQuit).toBe(false);
+			expect(mockAutoUpdater.checkForUpdates).not.toHaveBeenCalled();
+			expect(mockAutoUpdater.downloadUpdate).not.toHaveBeenCalled();
+			expect(mockAutoUpdater.quitAndInstall).not.toHaveBeenCalled();
+			expect(beforeInstall).not.toHaveBeenCalled();
+		}
+	);
 
 	describe('updates:install handler', () => {
 		it('invokes onBeforeQuitAndInstall before quitAndInstall', async () => {

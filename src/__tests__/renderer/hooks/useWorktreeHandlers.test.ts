@@ -432,11 +432,13 @@ describe('handleSaveWorktreeConfig', () => {
 			activeSessionId: 'parent-1',
 		} as any);
 		mockGit.scanWorktreeDirectory.mockResolvedValueOnce({
-			gitSubdirs: [{
-				path: '/projects/worktrees/stormbox-tags',
-				branch: 'message-tags',
-				name: 'stormbox-tags',
-			}],
+			gitSubdirs: [
+				{
+					path: '/projects/worktrees/stormbox-tags',
+					branch: 'message-tags',
+					name: 'stormbox-tags',
+				},
+			],
 		});
 
 		const { result } = renderHook(() => useWorktreeHandlers());
@@ -447,7 +449,9 @@ describe('handleSaveWorktreeConfig', () => {
 			});
 		});
 
-		const child = useSessionStore.getState().sessions.find((s) => s.worktreeBranch === 'message-tags');
+		const child = useSessionStore
+			.getState()
+			.sessions.find((s) => s.worktreeBranch === 'message-tags');
 		expect(child?.name).toBe('stormbox-tags');
 		expect(child?.cwd).toBe('/projects/worktrees/stormbox-tags');
 	});
@@ -1438,7 +1442,12 @@ describe('Effects', () => {
 				success: true,
 				worktrees: [
 					{ path: '/remote/repo', branch: 'main', head: 'abc', isBare: false },
-					{ path: '/remote/worktrees/stormbox-tags', branch: 'message-tags', head: 'abc', isBare: false },
+					{
+						path: '/remote/worktrees/stormbox-tags',
+						branch: 'message-tags',
+						head: 'abc',
+						isBare: false,
+					},
 					{ path: '/remote/worktrees/review-a', branch: null, head: 'abc', isBare: false },
 					{ path: '/remote/worktrees/review-b', branch: null, head: 'abc', isBare: false },
 					{ path: '/tmp/outside', branch: null, head: 'abc', isBare: false },
@@ -1456,7 +1465,9 @@ describe('Effects', () => {
 
 			expect(mockGit.listWorktrees).toHaveBeenCalledWith('/remote/repo', 'ssh-1');
 			expect(mockGit.scanWorktreeDirectory).not.toHaveBeenCalled();
-			const children = useSessionStore.getState().sessions.filter((s) => s.parentSessionId === 'parent-1');
+			const children = useSessionStore
+				.getState()
+				.sessions.filter((s) => s.parentSessionId === 'parent-1');
 			expect(children.map((s) => s.cwd).sort()).toEqual([
 				'/remote/worktrees/review-a',
 				'/remote/worktrees/review-b',
@@ -1475,24 +1486,43 @@ describe('Effects', () => {
 				sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
 			};
 			const oldChild = createChildSession({
-				id: 'old-child', name: 'message-tags', worktreeBranch: 'message-tags',
+				id: 'old-child',
+				name: 'message-tags',
+				worktreeBranch: 'message-tags',
 				cwd: '/remote/worktrees/stormbox-tags',
 			});
 			const customChild = createChildSession({
-				id: 'custom-child', name: 'My tags agent', worktreeBranch: 'other-tags',
+				id: 'custom-child',
+				name: 'My tags agent',
+				worktreeBranch: 'other-tags',
 				cwd: '/remote/worktrees/stormbox-other-tags',
 			});
 			mockGit.listWorktrees.mockResolvedValueOnce({
 				success: true,
 				worktrees: [
-					{ path: '/remote/worktrees/stormbox-tags', branch: 'message-tags', head: 'abc', isBare: false },
-					{ path: '/remote/worktrees/stormbox-other-tags', branch: 'other-tags', head: 'abc', isBare: false },
+					{
+						path: '/remote/worktrees/stormbox-tags',
+						branch: 'message-tags',
+						head: 'abc',
+						isBare: false,
+					},
+					{
+						path: '/remote/worktrees/stormbox-other-tags',
+						branch: 'other-tags',
+						head: 'abc',
+						isBare: false,
+					},
 				],
 			});
-			useSessionStore.setState({ sessions: [parent, oldChild, customChild], sessionsLoaded: true } as any);
+			useSessionStore.setState({
+				sessions: [parent, oldChild, customChild],
+				sessionsLoaded: true,
+			} as any);
 
 			renderHook(() => useWorktreeHandlers());
-			await act(async () => { await vi.runAllTimersAsync(); });
+			await act(async () => {
+				await vi.runAllTimersAsync();
+			});
 
 			const sessions = useSessionStore.getState().sessions;
 			expect(sessions.find((s) => s.id === 'old-child')?.name).toBe('stormbox-tags');
@@ -1638,7 +1668,10 @@ describe('Effects', () => {
 			mockFs.stat.mockResolvedValue({ isDirectory: true });
 			useSessionStore.setState({
 				sessions: [
-					{ ...mockParentSession, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false } },
+					{
+						...mockParentSession,
+						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false },
+					},
 					child,
 				],
 				sessionsLoaded: true,
@@ -1973,10 +2006,12 @@ describe('Effects', () => {
 
 		it('passes the remote ID so SSH worktree folders are not watched locally', () => {
 			useSessionStore.setState({
-				sessions: [{
-					...mockParentSession,
-					sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
-				}],
+				sessions: [
+					{
+						...mockParentSession,
+						sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+					},
+				],
 				sessionsLoaded: false,
 			} as any);
 
@@ -2548,12 +2583,14 @@ describe('Effects', () => {
 				worktreeBranch: 'feature',
 			});
 			mockGit.scanWorktreeDirectory.mockResolvedValue({
-				gitSubdirs: [{
-					path: child.cwd,
-					branch: 'feature',
-					name: 'feature',
-					repoRoot: child.cwd,
-				}],
+				gitSubdirs: [
+					{
+						path: child.cwd,
+						branch: 'feature',
+						name: 'feature',
+						repoRoot: child.cwd,
+					},
+				],
 			});
 			mockGit.worktreeInfo.mockResolvedValue({
 				success: true,
@@ -2563,7 +2600,11 @@ describe('Effects', () => {
 			});
 			useSessionStore.setState({
 				sessions: [
-					{ ...mockParentSession, cwd: '/repos/repo-a', worktreeConfig: { basePath: '/shared/worktrees', watchEnabled: false } },
+					{
+						...mockParentSession,
+						cwd: '/repos/repo-a',
+						worktreeConfig: { basePath: '/shared/worktrees', watchEnabled: false },
+					},
 					child,
 				],
 				sessionsLoaded: true,

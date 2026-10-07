@@ -43,6 +43,7 @@
 		"package": "node scripts/set-version.mjs npm run build && node scripts/set-version.mjs electron-builder --mac --win --linux",
 		"package:mac": "node scripts/set-version.mjs npm run build && node scripts/set-version.mjs electron-builder --mac",
 		"package:win": "node scripts/set-version.mjs npm run build && node scripts/set-version.mjs electron-builder --win",
+		"package:win:local": "node scripts/set-version.mjs npm run build && node scripts/set-version.mjs electron-builder --win portable --x64 --config electron-builder.local.cjs --publish never",
 		"package:linux": "node scripts/set-version.mjs npm run build && node scripts/set-version.mjs electron-builder --linux",
 		"start": "electron .",
 		"clean": "rm -rf dist release node_modules/.vite",
