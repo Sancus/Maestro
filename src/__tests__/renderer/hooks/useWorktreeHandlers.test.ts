@@ -5775,7 +5775,7 @@ describe('Multi-parent scan arguments and SSH host identity', () => {
 			['different path', 'same path'].map((pathRelationship) => ({ mode, pathRelationship }))
 		)
 	)(
-		'retains SSH1 chats and discovers distinct SSH2 worktrees at a $pathRelationship during $mode after parent host changes',
+		'retains SSH1 chats and discovers SSH2 worktrees only beside them at a $pathRelationship during $mode after parent host changes',
 		async ({ mode, pathRelationship }) => {
 			vi.useFakeTimers();
 			const parent = {
@@ -5819,19 +5819,74 @@ describe('Multi-parent scan arguments and SSH host identity', () => {
 			);
 			expect(children).not.toContain(inheritedMissing);
 			const discovered = children.filter((session) => session.id !== oldHostChild.id);
-			expect(discovered).toHaveLength(1);
-			expect(discovered[0]).toEqual(
-				expect.objectContaining({
-					cwd: '/remote/wt/shared',
-					worktreeBranch: 'new-host',
-					sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
-				})
-			);
+			if (pathRelationship === 'same path') {
+				// Children keep the remote they were created with, so the retained chat
+				// already owns this path: a second child there is a duplicate agent.
+				expect(discovered).toEqual([]);
+			} else {
+				expect(discovered).toHaveLength(1);
+				expect(discovered[0]).toEqual(
+					expect.objectContaining({
+						cwd: '/remote/wt/shared',
+						worktreeBranch: 'new-host',
+						sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
+					})
+				);
+			}
 			expect(notifyToast).toHaveBeenCalledWith(
 				expect.objectContaining({ title: 'Worktree Removed', message: 'inherited-missing' })
 			);
 			expect(notifyToast).not.toHaveBeenCalledWith(
 				expect.objectContaining({ title: 'Worktree Removed', message: 'old-host' })
+			);
+		}
+	);
+
+	it.each(['startup', 'save', 'refresh'])(
+		'adds no duplicate children during %s after the parent moves to another SSH remote',
+		async (mode) => {
+			vi.useFakeTimers();
+			// Children copy the parent's remote at creation and keep it when the
+			// parent is retargeted, so every registry worktree already has a child.
+			const parent = {
+				...mockParentSession,
+				cwd: '/remote/repo',
+				worktreeConfig: { basePath: '/remote/wt', watchEnabled: false },
+				sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-b' },
+			};
+			const remoteA = { enabled: true, remoteId: 'ssh-a' };
+			const featureA = createChildSession({
+				id: 'feature-a-chat',
+				cwd: '/remote/wt/feature-a',
+				worktreeBranch: 'feature-a',
+				sessionSshRemoteConfig: remoteA,
+			});
+			const featureB = createChildSession({
+				id: 'feature-b-chat',
+				cwd: '/remote/wt/feature-b',
+				worktreeBranch: 'feature-b',
+				sessionSshRemoteConfig: remoteA,
+			});
+			mockGit.listWorktrees.mockResolvedValue({
+				resolvedCwd: parent.cwd,
+				resolvedBasePath: '/remote/wt',
+				resolvedSessionPaths: {
+					[featureA.cwd]: featureA.cwd,
+					[featureB.cwd]: featureB.cwd,
+				},
+				worktrees: [
+					registryEntry(parent.cwd, 'main'),
+					registryEntry(featureA.cwd, 'feature-a'),
+					registryEntry(featureB.cwd, 'feature-b'),
+				],
+			});
+			await runConfiguredScan(mode, parent, [featureA, featureB]);
+			const children = useSessionStore
+				.getState()
+				.sessions.filter((session) => session.parentSessionId === parent.id);
+			expect(children).toEqual([featureA, featureB]);
+			expect(notifyToast).not.toHaveBeenCalledWith(
+				expect.objectContaining({ title: 'Worktree Removed' })
 			);
 		}
 	);
@@ -5951,7 +6006,7 @@ describe('Configured SSH target precedence over the previous spawn', () => {
 		expect(gitService.getBranches).not.toHaveBeenCalled();
 	});
 
-	it('scans locally for a disabled parent and discovers a local same-path chat beside its SSH1 child', async () => {
+	it('scans locally for a disabled parent and adds no second child at the path of its SSH1 child', async () => {
 		const parent = {
 			...mockParentSession,
 			cwd: '/local/repo',
@@ -5992,14 +6047,9 @@ describe('Configured SSH target precedence over the previous spawn', () => {
 		expect(children.find((session) => session.id === oldHostChild.id)?.aiTabs).toBe(
 			oldHostChild.aiTabs
 		);
-		expect(children.filter((session) => session.id !== oldHostChild.id)).toEqual([
-			expect.objectContaining({
-				cwd: '/local/wt/shared',
-				worktreeBranch: 'local',
-				sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
-			}),
-		]);
-		expect(gitService.getBranches).toHaveBeenCalledWith('/local/wt/shared', undefined);
+		// The retained SSH1 chat already owns this path; a second child is a duplicate.
+		expect(children.filter((session) => session.id !== oldHostChild.id)).toEqual([]);
+		expect(gitService.getBranches).not.toHaveBeenCalledWith('/local/wt/shared', undefined);
 	});
 
 	it('treats an explicitly disabled child as local despite its previous SSH1 spawn and enabled parent', async () => {
@@ -6039,14 +6089,9 @@ describe('Configured SSH target precedence over the previous spawn', () => {
 		expect(children.find((session) => session.id === localChild.id)?.aiTabs).toBe(
 			localChild.aiTabs
 		);
-		expect(children.filter((session) => session.id !== localChild.id)).toEqual([
-			expect.objectContaining({
-				cwd: '/remote/wt/shared',
-				worktreeBranch: 'ssh-host',
-				sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
-			}),
-		]);
-		expect(gitService.getBranches).toHaveBeenCalledWith('/remote/wt/shared', 'ssh-1');
+		// The kept local chat already owns this path; a second child is a duplicate.
+		expect(children.filter((session) => session.id !== localChild.id)).toEqual([]);
+		expect(gitService.getBranches).not.toHaveBeenCalledWith('/remote/wt/shared', 'ssh-1');
 	});
 });
 
@@ -6088,13 +6133,18 @@ describe('Local child identity and watcher targets', () => {
 			expect(children.find((session) => session.id === localChild.id)?.aiTabs).toBe(
 				localChild.aiTabs
 			);
-			expect(children.filter((session) => session.id !== localChild.id)).toEqual([
-				expect.objectContaining({
-					cwd: remotePath,
-					worktreeBranch: 'ssh2-chat',
-					sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
-				}),
-			]);
+			expect(children.filter((session) => session.id !== localChild.id)).toEqual(
+				// The kept local chat already owns a same-path registry entry.
+				registryStatus === 'same path'
+					? []
+					: [
+							expect.objectContaining({
+								cwd: remotePath,
+								worktreeBranch: 'ssh2-chat',
+								sessionSshRemoteConfig: parent.sessionSshRemoteConfig,
+							}),
+						]
+			);
 			expect(notifyToast).not.toHaveBeenCalledWith(
 				expect.objectContaining({ title: 'Worktree Removed', message: 'local-chat' })
 			);

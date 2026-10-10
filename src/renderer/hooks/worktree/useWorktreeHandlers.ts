@@ -725,16 +725,18 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 						if (existingByBranch) continue;
 
 						// Each parent owns its own child, including when siblings share a path.
+						// A child of this parent already at the path blocks a second one even
+						// when it still carries the remote the parent was retargeted away from.
 						const normalizedSubdirPath = normalizeWorktreePath(subdir.path);
 						const existingByPath = latestSessions.find(
 							(s) =>
 								typeof s.cwd === 'string' &&
 								s.parentSessionId === activeSession.id &&
-								getSshRemoteId(s, true) === parentSshRemoteId &&
 								(normalizeWorktreePath(s.cwd) === normalizedSubdirPath ||
-									(!parentSshRemoteId && sessionMatchesWorktreeRoot(s, normalizedSubdirPath)) ||
-									(!unresolvedSessionIds.has(s.id) &&
-										normalizeSessionPath(s.cwd) === normalizedSubdirPath))
+									(getSshRemoteId(s, true) === parentSshRemoteId &&
+										((!parentSshRemoteId && sessionMatchesWorktreeRoot(s, normalizedSubdirPath)) ||
+											(!unresolvedSessionIds.has(s.id) &&
+												normalizeSessionPath(s.cwd) === normalizedSubdirPath))))
 						);
 						if (existingByPath) continue;
 
@@ -1275,8 +1277,10 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 						const existingSession = latestSessions.find((s) => {
 							if (typeof s.cwd !== 'string' || stalePending.has(s.id)) return false;
 							if (s.parentSessionId !== parentSession.id) return false;
-							if (getSshRemoteId(s, true) !== sshRemoteId) return false;
+							// A child already at this path blocks a second one even when it still
+							// carries the remote the parent was retargeted away from.
 							if (normalizeWorktreePath(s.cwd) === normalizedSubdirPath) return true;
+							if (getSshRemoteId(s, true) !== sshRemoteId) return false;
 							if (!sshRemoteId && sessionMatchesWorktreeRoot(s, normalizedSubdirPath)) return true;
 							if (unresolvedSessionIds.has(s.id)) return false;
 							const normalizedCwd = normalizeSessionPath(s.cwd);
@@ -1431,12 +1435,24 @@ export function useWorktreeHandlers(deps: UseWorktreeHandlersDeps = {}): Worktre
 					]);
 				};
 				const currentPaths = new Set(prev.filter((s) => typeof s.cwd === 'string').map(pathKey));
+				// Children copy the parent's remote at creation, so after a retarget an
+				// existing child at the same path still names the old remote. The path
+				// alone decides whether this parent already has a child there.
+				const rawPathKey = (session: Session) =>
+					JSON.stringify([
+						session.parentSessionId,
+						normalizePath(session.cwd, !!getSshRemoteId(session, true)),
+					]);
+				const currentRawPaths = new Set(
+					prev.filter((s) => typeof s.cwd === 'string' && s.parentSessionId).map(rawPathKey)
+				);
 				const trulyNew = newWorktreeSessions.filter(
 					(s) =>
 						!!s.parentSessionId &&
 						!!scanGuards.get(s.parentSessionId)?.() &&
 						!creationGuards.get(s.parentSessionId)?.(s.cwd) &&
-						!currentPaths.has(pathKey(s))
+						!currentPaths.has(pathKey(s)) &&
+						!currentRawPaths.has(rawPathKey(s))
 				);
 				if (trulyNew.length === 0) return prev;
 				return [...prev, ...trulyNew];
