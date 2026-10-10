@@ -5,11 +5,13 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	realpathSync,
 	renameSync,
 	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'fs';
+import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi, type TestContext } from 'vitest';
 import type { SshRemoteConfig } from '../../../shared/types';
@@ -51,7 +53,26 @@ function findPortableShell(): string | undefined {
 
 const portableShell = findPortableShell();
 const gitAvailable = spawnSync('git', ['--version'], { timeout: 5000 }).status === 0;
-const fixturesDirectory = path.resolve(process.cwd(), '.maestro');
+// Keep fixtures out of the checkout: a stray repository or worktree here must
+// never sit inside the project being tested.
+const fixturesDirectory = realpathSync.native(os.tmpdir());
+// Git exports its repository-location variables to hooks, and from a linked
+// worktree that includes GIT_DIR. A fixture `git init` / `commit` / `worktree add`
+// that inherits them operates on the HOST repository instead of the fixture.
+const gitLocalEnvVars = (() => {
+	const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
+		encoding: 'utf8',
+		timeout: 5000,
+	});
+	return result.status === 0 ? result.stdout.split(/\r?\n/).filter(Boolean) : [];
+})();
+
+/** The test process environment without any variable that points git at a repository. */
+function fixtureEnv(): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = { ...process.env, LC_ALL: 'C' };
+	for (const name of gitLocalEnvVars) delete env[name];
+	return env;
+}
 const remote: SshRemoteConfig = {
 	id: 'actual-shell-remote',
 	name: 'Actual shell',
@@ -78,7 +99,7 @@ describe.skipIf(!portableShell)('remote worktree paths with a real POSIX shell',
 			cwd: path.join(fixtureRoot, 'repo'),
 			encoding: 'utf8',
 			timeout: 5000,
-			env: { ...process.env, LC_ALL: 'C' },
+			env: fixtureEnv(),
 		});
 		expect(result.status, result.stderr).toBe(0);
 		return result.stdout;
@@ -96,7 +117,6 @@ describe.skipIf(!portableShell)('remote worktree paths with a real POSIX shell',
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		mkdirSync(fixturesDirectory, { recursive: true });
 		fixtureRoot = mkdtempSync(path.join(fixturesDirectory, 'remote-worktree-paths-'));
 		mkdirSync(path.join(fixtureRoot, 'repo'));
 		mkdirSync(path.join(fixtureRoot, 'physical', 'worktrees'), { recursive: true });
@@ -104,6 +124,7 @@ describe.skipIf(!portableShell)('remote worktree paths with a real POSIX shell',
 			cwd: fixtureRoot,
 			encoding: 'utf8',
 			timeout: 5000,
+			env: fixtureEnv(),
 		});
 		expect(location.status).toBe(0);
 		shellRoot = location.stdout.replace(/\n$/, '');
@@ -123,7 +144,7 @@ describe.skipIf(!portableShell)('remote worktree paths with a real POSIX shell',
 				cwd: fixtureRoot,
 				encoding: 'utf8',
 				timeout: 5000,
-				env: { ...process.env, LC_ALL: 'C' },
+				env: fixtureEnv(),
 			});
 			return {
 				// Git for Windows prints drive paths; the remote fixture uses its POSIX shell paths.
