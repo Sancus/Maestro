@@ -475,6 +475,11 @@ async function scanConfiguredWorktrees(
 			return { ...worktree, path };
 		})
 		.filter((worktree) => isPathAtOrUnderRoot(worktree.path, base))
+		// A detached worktree has no branch in the registry. The local scan skips it
+		// (rev-parse --abbrev-ref answers HEAD), so SSH does not discover one either.
+		// Retention reads registeredWorktreePaths, so an existing child that became
+		// detached stays attached.
+		.filter((worktree) => worktree.branch != null)
 		.map((worktree) => ({
 			path: worktree.path,
 			name: normalizePath(worktree.path, true).split('/').pop() || worktree.path,

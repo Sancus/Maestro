@@ -1595,7 +1595,7 @@ describe('Effects', () => {
 			expect(worktreeSessions.length).toBe(2);
 		});
 
-		it('uses the SSH git registry to discover multiple detached worktrees', async () => {
+		it('keeps an existing detached SSH child but discovers no new detached worktree', async () => {
 			vi.useFakeTimers();
 			const parent = {
 				...mockParentSession,
@@ -1639,13 +1639,49 @@ describe('Effects', () => {
 			const children = useSessionStore
 				.getState()
 				.sessions.filter((s) => s.parentSessionId === parent.id);
+			// The local scan skips a detached worktree, so SSH discovers none either.
 			expect(children.map((s) => s.cwd).sort()).toEqual([
 				'/remote/worktrees/feature',
 				'/remote/worktrees/review',
-				'/remote/worktrees/review-2',
 			]);
-			expect(children.find((s) => s.cwd.endsWith('/review'))?.worktreeBranch).toBeNull();
+			expect(children).toContain(existingDetached);
 		});
+
+		it.each(['startup', 'save', 'refresh'])(
+			'keeps an SSH child whose worktree became detached during %s',
+			async (mode) => {
+				vi.useFakeTimers();
+				const parent = {
+					...mockParentSession,
+					cwd: '/remote/repo',
+					worktreeConfig: { basePath: '/remote/worktrees', watchEnabled: false },
+					sessionSshRemoteConfig: { enabled: true, remoteId: 'ssh-1' },
+				};
+				const child = createChildSession(parent, {
+					id: 'now-detached-chat',
+					cwd: '/remote/worktrees/feature',
+					worktreeBranch: 'feature',
+				});
+				mockGit.listWorktrees.mockResolvedValue({
+					resolvedCwd: '/remote/repo',
+					resolvedBasePath: '/remote/worktrees',
+					resolvedSessionPaths: { [child.cwd]: child.cwd },
+					worktrees: [
+						registryEntry('/remote/repo', 'main'),
+						registryEntry(child.cwd, null),
+						registryEntry('/remote/worktrees/new-detached', null),
+					],
+				});
+				await runConfiguredScan(mode, parent, [child]);
+				const children = useSessionStore
+					.getState()
+					.sessions.filter((s) => s.parentSessionId === parent.id);
+				expect(children).toEqual([child]);
+				expect(notifyToast).not.toHaveBeenCalledWith(
+					expect.objectContaining({ title: 'Worktree Removed' })
+				);
+			}
+		);
 
 		it('preserves an SSH child when the git listing fails', async () => {
 			vi.useFakeTimers();
@@ -1708,8 +1744,8 @@ describe('Effects', () => {
 						: {}),
 					worktrees: [
 						registryEntry('/remote/repo', 'main'),
-						registryEntry(`${resolvedBasePath}/review`, null),
-						registryEntry(`${resolvedBasePath}/review-2`, null),
+						registryEntry(`${resolvedBasePath}/review`, 'attached'),
+						registryEntry(`${resolvedBasePath}/review-2`, 'attached'),
 						registryEntry(`${resolvedBasePath}/feature`, 'feature'),
 					],
 				});
@@ -1752,7 +1788,7 @@ describe('Effects', () => {
 				resolvedBasePath: '/physical/worktrees',
 				worktrees: [
 					registryEntry('/physical/worktrees/parent', 'parent-feature'),
-					registryEntry('/physical/worktrees/review', null),
+					registryEntry('/physical/worktrees/review', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent], sessionsLoaded: true } as any);
@@ -1795,7 +1831,7 @@ describe('Effects', () => {
 				resolvedSessionPaths: { '~/worktrees/review': '/physical/worktrees/review' },
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry('/physical/Worktrees/review', null),
+					registryEntry('/physical/Worktrees/review', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -1936,14 +1972,19 @@ describe('Effects', () => {
 				const children = useSessionStore
 					.getState()
 					.sessions.filter((session) => session.parentSessionId === parent.id);
-				expect(children).toHaveLength(2);
+				// A detached replacement is not discovered, matching the local scan.
+				expect(children).toHaveLength(branch === null ? 1 : 2);
 				expect(children).toContain(healthy);
 				expect(children).not.toContain(stale);
 				const replacement = children.find(
 					(session) => session.cwd === '/physical/worktrees/recreated'
 				);
-				expect(replacement).toBeDefined();
-				expect(replacement?.worktreeBranch ?? null).toBe(branch);
+				if (branch === null) {
+					expect(replacement).toBeUndefined();
+				} else {
+					expect(replacement).toBeDefined();
+					expect(replacement?.worktreeBranch).toBe(branch);
+				}
 				expect(notifyToast).toHaveBeenCalledWith(
 					expect.objectContaining({ title: 'Worktree Removed' })
 				);
@@ -2075,7 +2116,7 @@ describe('Effects', () => {
 				resolvedBasePath: '/physical/worktrees',
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry('/physical/worktrees/review', null),
+					registryEntry('/physical/worktrees/review', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -2173,8 +2214,8 @@ describe('Effects', () => {
 				resolvedSessionPaths: { [child.cwd]: '/physical/worktrees/review\\one' },
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry('/physical/worktrees/review\\one', null),
-					registryEntry('/physical/worktrees/review/one', null),
+					registryEntry('/physical/worktrees/review\\one', 'attached'),
+					registryEntry('/physical/worktrees/review/one', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -2216,8 +2257,8 @@ describe('Effects', () => {
 				resolvedBasePath: '/physical/worktrees',
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry(child.cwd, null),
-					registryEntry('/physical/worktrees/review\\one', null),
+					registryEntry(child.cwd, 'attached'),
+					registryEntry('/physical/worktrees/review\\one', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -2290,8 +2331,8 @@ describe('Effects', () => {
 				resolvedBasePath: '/home/dev/worktrees',
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry('/home/dev/worktrees/review\\one', null),
-					registryEntry('/home/dev/worktrees/review/one', null),
+					registryEntry('/home/dev/worktrees/review\\one', 'attached'),
+					registryEntry('/home/dev/worktrees/review/one', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -2332,7 +2373,7 @@ describe('Effects', () => {
 				resolvedBasePath: '/physical/worktrees',
 				worktrees: [
 					registryEntry('/remote/repo', 'main'),
-					registryEntry('/physical/worktrees/review', null),
+					registryEntry('/physical/worktrees/review', 'attached'),
 				],
 			});
 			useSessionStore.setState({ sessions: [parent, child], sessionsLoaded: true } as any);
@@ -2376,8 +2417,8 @@ describe('Effects', () => {
 					resolvedBasePath: basePath === '/' ? '/' : '/physical/worktrees',
 					worktrees: [
 						registryEntry('/remote/repo', 'main'),
-						registryEntry(childPath, null),
-						registryEntry(`${childPath}-2`, null),
+						registryEntry(childPath, 'attached'),
+						registryEntry(`${childPath}-2`, 'attached'),
 						...(siblingPath
 							? [{ path: siblingPath, branch: 'outside', head: 'jkl', isBare: false }]
 							: []),
